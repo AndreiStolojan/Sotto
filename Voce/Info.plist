@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>SottoChannel</key>
+	<string>$(SOTTO_CHANNEL)</string>
+	<key>SottoCommit</key>
+	<string>$(SOTTO_COMMIT)</string>
 	<key>LSUIElement</key>
 	<false/>
 	<key>NSMicrophoneUsageDescription</key>

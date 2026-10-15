@@ -70,11 +70,20 @@ if [[ ! -f "$framework_path/Info.plist" ]]; then
     mv "$stage/unpacked/build-apple/whisper.xcframework" "$framework_path"
 fi
 
-echo "==> Building $app_name (Release, $(uname -m)). The first build takes several minutes."
+# Settings shows the commit and compares it with the channel's branch on GitHub. Only a checkout whose own
+# top level is this folder counts, so a source copy inside another repository gets no commit ("local build").
+commit= commit_label="local build"
+if cdup="$(git -C "$repo_dir" rev-parse --show-cdup 2>/dev/null)" && [[ -z "$cdup" ]]; then
+    commit="$(git -C "$repo_dir" rev-parse HEAD)"
+    commit_label="${commit:0:7}"
+fi
+
+echo "==> Building $app_name (Release, $(uname -m), $commit_label). The first build takes several minutes."
 echo "    Warnings from dependencies such as FluidAudio are expected."
 cd "$repo_dir"
 # The project signs ad-hoc ("Sign to Run Locally"), so no Apple developer team is needed.
 # APP_BUNDLE_ID_SUFFIX, APP_NAME_SUFFIX and APP_ICON_NAME turn the same target into Sotto Beta.
+# SOTTO_CHANNEL and SOTTO_COMMIT land in Info.plist (see Voce/Info.plist) before the app is signed.
 xcodebuild -project Voce.xcodeproj -scheme Voce -configuration Release \
     -derivedDataPath "$derived_dir" \
     -clonedSourcePackagesDirPath "$deps_dir/SourcePackages" \
@@ -82,6 +91,7 @@ xcodebuild -project Voce.xcodeproj -scheme Voce -configuration Release \
     -skipPackagePluginValidation -skipMacroValidation \
     ARCHS="$(uname -m)" ONLY_ACTIVE_ARCH=YES COMPILER_INDEX_STORE_ENABLE=NO \
     APP_BUNDLE_ID_SUFFIX="$bundle_suffix" APP_NAME_SUFFIX="$name_suffix" APP_ICON_NAME="$icon_name" \
+    SOTTO_CHANNEL="$channel" SOTTO_COMMIT="$commit" \
     -quiet build
 
 app_path="$derived_dir/Build/Products/Release/$app_name.app"

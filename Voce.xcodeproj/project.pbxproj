@@ -407,6 +407,8 @@
 				APP_BUNDLE_ID_SUFFIX = .dev;
 				APP_ICON_NAME = AppIcon;
 				APP_NAME_SUFFIX = " Dev";
+				SOTTO_CHANNEL = "";
+				SOTTO_COMMIT = "";
 				CODE_SIGN_IDENTITY = "-";
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
@@ -478,6 +480,8 @@
 				APP_BUNDLE_ID_SUFFIX = "";
 				APP_ICON_NAME = AppIcon;
 				APP_NAME_SUFFIX = "";
+				SOTTO_CHANNEL = "";
+				SOTTO_COMMIT = "";
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
