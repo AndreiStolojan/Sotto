@@ -1,0 +1,12 @@
+Feather tap start and stop are adapted from Kenney Interface Sounds (1.0), CC0.
+Author: Kenney (www.kenney.nl)
+Source: https://kenney.nl/assets/interface-sounds
+Original files: switch_005.ogg and switch_006.ogg
+
+Adaptations: silence trimmed, two-stage 1250 Hz low-pass filtering,
+8 ms attack and 14 ms release fades, peak amplitude 0.16.
+Reproduction: ffmpeg with the filters above.
+
+License: Creative Commons Zero, CC0
+https://creativecommons.org/publicdomain/zero/1.0/
+You may use, modify and distribute these sounds, including commercially.

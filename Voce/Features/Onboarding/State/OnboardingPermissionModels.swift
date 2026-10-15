@@ -1,0 +1,188 @@
+import SwiftUI
+
+enum OnboardingStage: String, CaseIterable {
+    case permissions
+    case microphone
+    case model
+    case experience
+    case contextAwareness
+    case trust
+
+    var stepNumber: Int {
+        switch self {
+        case .permissions:
+            return 1
+        case .microphone:
+            return 2
+        case .model:
+            return 3
+        case .experience:
+            return 4
+        case .contextAwareness:
+            return 5
+        case .trust:
+            return 6
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .permissions:
+            return "lock.shield"
+        case .microphone:
+            return "mic"
+        case .model:
+            return "captions.bubble"
+        case .experience:
+            return "square.grid.2x2.fill"
+        case .contextAwareness:
+            return "slider.horizontal.3"
+        case .trust:
+            return "lock.shield"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .permissions:
+            return String(localized: "Allow Permissions")
+        case .microphone:
+            return String(localized: "Choose Microphone")
+        case .model:
+            return String(localized: "Configure Transcription Model")
+        case .experience:
+            return String(localized: "Experience Sotto")
+        case .contextAwareness:
+            return String(localized: "Sotto is Context-Aware")
+        case .trust:
+            return String(localized: "Sotto Stays Local")
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .permissions:
+            return String(localized: "Allow Sotto to work across all your apps.")
+        case .microphone:
+            return String(localized: "Pick the microphone Sotto should use for recordings.")
+        case .model:
+            return String(localized: "Download NVIDIA's Parakeet model to transcribe locally.")
+        case .experience:
+            return String(localized: "Try a few short samples and see how Sotto works before you start.")
+        case .contextAwareness:
+            return String(
+                localized: "Sotto can select the right mode from the app you are using and the rules you configure.")
+        case .trust:
+            return String(localized: "Sotto is private by default. No data leaves your device unless you opt in.")
+        }
+    }
+
+    static var baseStepCount: Int {
+        3
+    }
+}
+
+enum OnboardingPermissionKind: String, CaseIterable, Identifiable {
+    case microphone
+    case accessibility
+    case screenRecording
+
+    var id: String { rawValue }
+
+    static var required: [OnboardingPermissionKind] {
+        [.microphone, .accessibility]
+    }
+
+    var isRequired: Bool {
+        Self.required.contains(self)
+    }
+
+    var descriptor: OnboardingPermissionDescriptor {
+        switch self {
+        case .microphone:
+            return OnboardingPermissionDescriptor(
+                title: "Microphone",
+                subtitle: String(localized: "Sotto uses your microphone to capture your voice.")
+            )
+
+        case .accessibility:
+            return OnboardingPermissionDescriptor(
+                title: String(localized: "Accessibility"),
+                subtitle: String(localized: "Sotto uses Accessibility to type transcriptions directly into any app.")
+            )
+
+        case .screenRecording:
+            return OnboardingPermissionDescriptor(
+                title: String(localized: "Screen Recording"),
+                subtitle: String(
+                    localized: "Sotto reads visible screen content to improve the accuracy of transcripts.")
+            )
+        }
+    }
+}
+
+struct OnboardingPermissionDescriptor {
+    let title: String
+    let subtitle: String
+}
+
+enum OnboardingPermissionStatus: Equatable {
+    case granted
+    case needsAccess
+    case denied
+    case restricted
+    case unknown
+
+    var isGranted: Bool {
+        self == .granted
+    }
+
+    var requiresSettings: Bool {
+        self == .denied || self == .restricted
+    }
+
+    var label: String {
+        switch self {
+        case .granted:
+            return String(localized: "Granted")
+        case .needsAccess:
+            return String(localized: "Needs access")
+        case .denied:
+            return String(localized: "Denied")
+        case .restricted:
+            return String(localized: "Restricted")
+        case .unknown:
+            return String(localized: "Unknown")
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .granted:
+            return AppTheme.Text.secondary
+        case .needsAccess:
+            return AppTheme.Text.secondary
+        case .denied, .restricted:
+            return AppTheme.Status.error
+        case .unknown:
+            return AppTheme.Text.secondary
+        }
+    }
+}
+
+enum PrivacySettingsPane {
+    case microphone
+    case accessibility
+    case screenRecording
+
+    var urlString: String {
+        switch self {
+        case .microphone:
+            return "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
+        case .accessibility:
+            return "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        case .screenRecording:
+            return "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+        }
+    }
+}

@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scripts:
+    name: Shell checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Check shell syntax
+        run: |
+          for script in install.sh scripts/*.sh; do
+            bash -n "$script"
+          done
+      - name: Lint shell scripts
+        run: shellcheck install.sh scripts/*.sh
+
+  macos:
+    name: Build and core tests
+    runs-on: macos-26
+    timeout-minutes: 15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Identify toolchain
+        id: toolchain
+        run: |
+          xcodebuild -version
+          echo "version=$(xcodebuild -version | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+      - name: Run core tests
+        timeout-minutes: 2
+        run: bash scripts/test-core.sh
+      - name: Check dictation sound preferences and playback gain
+        timeout-minutes: 2
+        run: python3 scripts/check-recording-sounds.py
+      - name: Check the Dock controller
+        timeout-minutes: 2
+        run: python3 scripts/validate-dock-controller.py
+      - name: Cache pinned dependencies and compiled modules
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            .build/deps
+            .build/stable/Build
+            .build/stable/ModuleCache.noindex
+          key: sotto-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.version }}-${{ hashFiles('Voce.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Voce.xcodeproj/project.pbxproj', 'scripts/build.sh') }}-${{ github.sha }}
+          restore-keys: |
+            sotto-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.version }}-${{ hashFiles('Voce.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Voce.xcodeproj/project.pbxproj', 'scripts/build.sh') }}-
+      - name: Check Metal compiler
+        run: |
+          if ! xcrun metal --version; then
+            xcodebuild -downloadComponent MetalToolchain
+            xcrun metal --version
+          fi
+      - name: Build and verify the app
+        run: |
+          set -o pipefail
+          bash scripts/build.sh 2>&1 | tee build.log
+      - name: Package verified app
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent "$(tail -n 1 build.log)" Sotto-macos-arm64.zip
+      - name: Upload development build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Sotto-macos-arm64-${{ github.sha }}
+          path: Sotto-macos-arm64.zip
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: build-log-${{ github.sha }}
+          path: build.log
+          retention-days: 3
