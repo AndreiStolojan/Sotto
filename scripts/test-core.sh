@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compile the production audio, transcript, language policy, session policy and Eclipse protocol code without launching the app.
+# Compile the production audio, transcript, language policy, session policy, Eclipse protocol and update check code without launching the app.
 set -euo pipefail
 
 repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
@@ -27,6 +27,7 @@ xcrun swiftc -D VOCE_LOCAL -parse-as-library \
     Voce/Features/ModelLibrary/Models/TranscriptionModelRegistry.swift \
     Voce/Core/Recording/RecordingState.swift \
     Voce/Features/Recording/Presentation/NotchSocket.swift \
+    Voce/Features/Settings/Updates/UpdateCheck.swift \
     Tests/CI/CoreTests.swift \
     -o "$test_dir/core-tests"
 "$test_dir/core-tests"

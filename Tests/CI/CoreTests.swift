@@ -14,6 +14,7 @@ struct CoreTests {
         checkTranscripts()
         checkLanguagePolicy()
         checkNotchProtocol()
+        checkUpdateCheck()
         print("\(checks) checks, \(failures) failures")
         if failures > 0 { exit(1) }
     }
@@ -160,5 +161,49 @@ struct CoreTests {
         expect(framer.append(oversized).isEmpty, "An oversized line yields nothing")
         expect(framer.append(Data(#"aaa\#n{"type":"stop"}\#n"#.utf8)).compactMap(NotchCommand.init(line:)) == [.stop],
                "The rest of an oversized line is dropped and the next line still decodes")
+    }
+
+    /// The manual update check: what the build reports, how GitHub's answer reads and what Terminal runs.
+    private static func checkUpdateCheck() {
+        let local = "3c2a404" + String(repeating: "a", count: 33)
+        let build = AppBuild(info: ["CFBundleShortVersionString": "0.1.0", "SottoChannel": "beta", "SottoCommit": local])
+        expect(build.channel == .beta && build.commit == local && build.summary == "0.1.0 · beta · 3c2a404",
+               "A build.sh build reports version, channel and short commit")
+        let unexpanded = AppBuild(info: ["CFBundleShortVersionString": "0.1.0", "SottoChannel": "", "SottoCommit": ""])
+        expect(unexpanded.channel == nil && unexpanded.commit == nil && unexpanded.summary == "0.1.0 · local build",
+               "A build without git or channel is a local build")
+
+        let answer = { (status: Int, remaining: String?, body: String) in
+            UpdateCheck.outcome(localCommit: local, status: status, rateLimitRemaining: remaining, body: Data(body.utf8))
+        }
+        let remote = String(repeating: "b", count: 40)
+        expect(answer(200, "59", local.uppercased() + "\n") == .success(.upToDate),
+               "The same SHA, in any case and with a trailing newline, is up to date")
+        expect(answer(200, "59", remote) == .success(.updateAvailable(commit: remote)),
+               "A different SHA is an update")
+        expect(answer(200, "59", "{\"sha\":\"\(remote)\"}") == .failure(.unexpectedResponse)
+               && answer(200, "59", String(remote.dropLast())) == .failure(.unexpectedResponse),
+               "Anything but one full SHA is rejected")
+        expect(answer(403, "0", "") == .failure(.rateLimited) && answer(429, nil, "") == .failure(.rateLimited)
+               && answer(403, "12", "") == .failure(.httpStatus(403)),
+               "Rate limits are told apart from other refusals")
+        expect(UpdateCheck.failure(for: URLError(.notConnectedToInternet)) == .offline
+               && UpdateCheck.failure(for: URLError(.timedOut)) == .timedOut,
+               "Offline and timeout errors get their own messages")
+
+        let request = UpdateCheck.request(for: .beta)
+        expect(request.url?.absoluteString == "https://api.github.com/repos/AndreiStolojan/Sotto/commits/beta"
+               && request.value(forHTTPHeaderField: "Accept") == "application/vnd.github.sha"
+               && request.httpMethod == "GET" && request.httpBody == nil,
+               "The check is a bodiless GET for the channel's branch head")
+        expect(UpdateCheck.request(for: .stable).url?.lastPathComponent == "main", "Stable follows main")
+
+        let installer = "curl -fsSL https://raw.githubusercontent.com/AndreiStolojan/Sotto/main/install.sh | bash"
+        expect(UpdateChannel.stable.installCommand == installer
+               && UpdateChannel.beta.installCommand == installer + " -s -- --beta",
+               "Each channel updates with its README install command")
+        let script = UpdateCheck.updateScript(for: .beta)
+        expect(script.hasPrefix("#!/bin/bash\n") && script.contains("set -euo pipefail\n" + UpdateChannel.beta.installCommand + "\n"),
+               "The update script runs the beta install command and stops on failure")
     }
 }
