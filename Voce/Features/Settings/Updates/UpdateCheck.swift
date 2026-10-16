@@ -66,7 +66,8 @@ enum UpdateCheck {
         }
     }
 
-    /// No cookies, cache or credentials, so the request carries nothing beyond its headers.
+    /// No cookies, cache, credentials or redirects, so the check stays one request to GitHub that carries nothing
+    /// beyond its headers.
     private static let session: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 10
@@ -75,8 +76,14 @@ enum UpdateCheck {
         configuration.httpShouldSetCookies = false
         configuration.urlCredentialStorage = nil
         configuration.urlCache = nil
-        return URLSession(configuration: configuration)
+        return URLSession(configuration: configuration, delegate: NoRedirects(), delegateQueue: nil)
     }()
+
+    /// Refuses every redirect; a 3xx answer then fails the check as an unexpected HTTP status.
+    private final class NoRedirects: NSObject, URLSessionTaskDelegate {
+        func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                        newRequest request: URLRequest) async -> URLRequest? { nil }
+    }
 
     static func request(for channel: UpdateChannel) -> URLRequest {
         var request = URLRequest(url: URL(string: "https://api.github.com/repos/\(repository)/commits/\(channel.branch)")!)
