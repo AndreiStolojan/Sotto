@@ -71,6 +71,8 @@ curl -fsSL https://raw.githubusercontent.com/AndreiStolojan/Sotto/main/install.s
 
 This builds the `beta` branch, where I try new features first, as a separate app called Sotto Beta. It has its own bundle ID, settings, history and permissions, so it can run next to the stable app without touching its data. Downloaded Parakeet models are shared between the two. Only run one at a time, since both listen for the Fn key.
 
+To update either app, open Settings > Updates and press Check. Sotto compares the commit it was built from with the newest commit on its branch (`main` for Sotto, `beta` for Sotto Beta). If they differ, Update opens Terminal and runs that channel's install command, and Copy Command copies it so you can run it yourself. Sotto never checks on its own. A copy built without git shows "local build" and cannot check.
+
 ## Permissions
 
 | Permission | Why |
@@ -82,9 +84,11 @@ This builds the `beta` branch, where I try new features first, as a separate app
 
 ## Privacy
 
-Your audio never leaves the Mac, and Sotto has no server, no account, no analytics and no update checks. A fresh install with default settings makes no network request except the model download you start. Here is everything that can leave the app, found by reading the code. Everything after the first item is off until you turn it on.
+Your audio never leaves the Mac, and Sotto has no server, no account, no analytics and no automatic update checks. A fresh install with default settings makes no network request except the model download you start. Here is everything that can leave the app, found by reading the code. Everything after the first item is off until you turn it on.
 
 **Downloads.** `install.sh` fetches the source and Swift packages from GitHub and the pinned whisper.cpp framework from its GitHub release. In the app, models download only when you pick one: Parakeet, Nemotron and the voice detector from [FluidInference](https://huggingface.co/FluidInference) on Hugging Face, Whisper from [ggerganov/whisper.cpp](https://huggingface.co/ggerganov/whisper.cpp), Cohere Transcribe and SenseVoice from [handy-computer](https://huggingface.co/handy-computer). Apple Speech gets its language files from Apple.
+
+**Update check.** Only when you press Check in Settings > Updates, Sotto sends one GET request to `https://api.github.com/repos/AndreiStolojan/Sotto/commits/<branch>`, with no account, cookies or app data, and gets back a commit SHA. GitHub sees your IP address and the time of the request. Update then runs `install.sh` in Terminal, which downloads the source as described above.
 
 **Text cleanup with Ollama.** Sotto talks to the Ollama address you set, `http://localhost:11434` by default. At launch it asks for the model list only if a mode or Auto Learn uses Ollama.
 
