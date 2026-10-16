@@ -311,6 +311,10 @@ struct SettingsView: View {
                 Text("Export all settings, or choose specific categories when importing a backup.")
             }
 
+            Section("Updates") {
+                UpdateSettingsView()
+            }
+
             Section("Diagnostics") {
                 DiagnosticsSettingsView()
             }
