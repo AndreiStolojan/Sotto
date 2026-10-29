@@ -379,19 +379,23 @@ class AudioDeviceManager: ObservableObject {
         let status = AudioObjectAddPropertyListener(
             systemObjectID,
             &address,
-            { (_, _, _, userData) -> OSStatus in
-                let manager = Unmanaged<AudioDeviceManager>.fromOpaque(userData!).takeUnretainedValue()
-                DispatchQueue.main.async {
-                    manager.handleDeviceListChange()
-                }
-                return noErr
-            },
+            Self.deviceListListener,
             UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
         )
 
         if status != noErr {
             logger.error("Failed to add device change listener: \(status, privacy: .public)")
         }
+    }
+
+    /// Shared by add and remove: removal unregisters the given proc, so both calls must pass this same one.
+    private static let deviceListListener: AudioObjectPropertyListenerProc = { _, _, _, userData in
+        guard let userData else { return noErr }
+        let manager = Unmanaged<AudioDeviceManager>.fromOpaque(userData).takeUnretainedValue()
+        DispatchQueue.main.async {
+            manager.handleDeviceListChange()
+        }
+        return noErr
     }
 
     private func handleDeviceListChange() {
@@ -492,12 +496,9 @@ class AudioDeviceManager: ObservableObject {
         AudioObjectRemovePropertyListener(
             AudioObjectID(kAudioObjectSystemObject),
             &address,
-            { (_, _, _, userData) -> OSStatus in
-                return noErr
-            },
+            Self.deviceListListener,
             UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
         )
-
     }
 
     private func createPropertyAddress(

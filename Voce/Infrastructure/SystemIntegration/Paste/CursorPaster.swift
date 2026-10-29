@@ -24,7 +24,15 @@ class CursorPaster {
 
     private static let prePasteDelay: TimeInterval = 0.10
     private static let pasteShortcutEventDelay: TimeInterval = 0.01
-    private static let minimumClipboardRestoreDelay: TimeInterval = 0.25
+
+    /// The latest paste session. Each new session waits for it, so one session's
+    /// Command-V can never paste text that a later session put on the clipboard.
+    @MainActor private static var latestPasteSession: Task<PasteOutcome, Never>?
+
+    /// The clipboard contents to put back once the most recent session's restore
+    /// delay ends. A session that starts before then inherits these contents
+    /// instead of snapshotting the previous session's transcription.
+    @MainActor private static var pendingRestore: (sessionID: String, contents: ClipboardSnapshot)?
 
     static func pasteAtCursor(_ text: String) {
         Task {
@@ -38,16 +46,20 @@ class CursorPaster {
     @MainActor
     @discardableResult
     static func startPasteAtCursor(_ text: String) -> Task<PasteOutcome, Never> {
-        Task { @MainActor in
-            await performPasteSession(text)
+        let previousSession = latestPasteSession
+        let session = Task { @MainActor in
+            _ = await previousSession?.value
+            return await performPasteSession(text)
         }
+        latestPasteSession = session
+        return session
     }
 
     @MainActor
     private static func performPasteSession(_ text: String) async -> PasteOutcome {
         let pasteboard = NSPasteboard.general
         let shouldRestoreClipboard = UserDefaults.standard.bool(forKey: "restoreClipboardAfterPaste")
-        let savedContents = shouldRestoreClipboard ? snapshotClipboard(from: pasteboard) : []
+        let savedContents = shouldRestoreClipboard ? contentsToRestore(from: pasteboard) : []
         let sessionID = UUID().uuidString
 
         guard
@@ -58,7 +70,18 @@ class CursorPaster {
             )
         else {
             logger.error("Failed to prepare clipboard for paste")
+            if shouldRestoreClipboard {
+                pendingRestore = nil
+                pasteboard.clearContents()
+                if !savedContents.isEmpty {
+                    pasteboard.writeObjects(pasteboardItems(from: savedContents))
+                }
+            }
             return PasteOutcome(result: .commandNotPosted, autoLearnGeneration: nil)
+        }
+
+        if shouldRestoreClipboard {
+            pendingRestore = (sessionID, savedContents)
         }
 
         await wait(prePasteDelay)
@@ -78,15 +101,34 @@ class CursorPaster {
             autoLearnGeneration = nil
         }
         if shouldRestoreClipboard {
-            scheduleClipboardRestore(
-                savedContents,
-                expectedText: text,
-                sessionID: sessionID,
-                on: pasteboard
-            )
+            scheduleClipboardRestore(expectedText: text, sessionID: sessionID, on: pasteboard)
         }
 
         return PasteOutcome(result: pasteResult, autoLearnGeneration: autoLearnGeneration)
+    }
+
+    /// Reads the user's clipboard for context, excluding Sotto's temporary paste payload.
+    @MainActor
+    static func clipboardContextText() -> String? {
+        let pasteboard = NSPasteboard.general
+        if let pendingRestore,
+            pasteboard.string(forType: ClipboardManager.pasteSessionType) == pendingRestore.sessionID
+        {
+            return pasteboardItems(from: pendingRestore.contents).lazy.compactMap { $0.string(forType: .string) }.first
+        }
+        return pasteboard.string(forType: .string)
+    }
+
+    /// Returns the user's clipboard contents. While an earlier session still owns
+    /// the pasteboard, those are the contents that session saved, not its text.
+    @MainActor
+    private static func contentsToRestore(from pasteboard: NSPasteboard) -> ClipboardSnapshot {
+        if let pendingRestore,
+            pasteboard.string(forType: ClipboardManager.pasteSessionType) == pendingRestore.sessionID
+        {
+            return pendingRestore.contents
+        }
+        return snapshotClipboard(from: pasteboard)
     }
 
     private static func snapshotClipboard(from pasteboard: NSPasteboard) -> ClipboardSnapshot {
@@ -109,23 +151,27 @@ class CursorPaster {
         }
     }
 
+    @MainActor
     private static func scheduleClipboardRestore(
-        _ savedContents: ClipboardSnapshot,
         expectedText: String,
         sessionID: String,
         on pasteboard: NSPasteboard
     ) {
-        let delay = max(
+        let delay = SettingsValueLimits.clamped(
             UserDefaults.standard.double(forKey: "clipboardRestoreDelay"),
-            minimumClipboardRestoreDelay
+            to: SettingsValueLimits.clipboardRestoreDelay
         )
 
         Task { @MainActor in
             await wait(delay)
+            // A newer session has taken over the saved contents and restores them itself.
+            guard let pendingRestore, pendingRestore.sessionID == sessionID else { return }
+            Self.pendingRestore = nil
             guard pasteboardStillOwnedByPasteSession(pasteboard, expectedText: expectedText, sessionID: sessionID)
             else {
                 return
             }
+            let savedContents = pendingRestore.contents
             pasteboard.clearContents()
             if !savedContents.isEmpty {
                 pasteboard.writeObjects(pasteboardItems(from: savedContents))
@@ -227,7 +273,7 @@ class CursorPaster {
     }
 
     private static func wait(_ seconds: TimeInterval) async {
-        guard seconds > 0 else { return }
+        guard seconds.isFinite, seconds > 0 else { return }
         let nanoseconds = UInt64(seconds * 1_000_000_000)
         try? await Task.sleep(nanoseconds: nanoseconds)
     }

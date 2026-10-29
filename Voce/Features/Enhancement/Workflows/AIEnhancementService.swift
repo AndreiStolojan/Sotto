@@ -202,6 +202,9 @@ class AIEnhancementService: ObservableObject {
             )
         } catch let error as EnhancementError {
             throw error
+        } catch is CancellationError {
+            // Cancellation is not a provider failure: callers must not save it as an enhancement error.
+            throw CancellationError()
         } catch {
             throw EnhancementError.customError(error.localizedDescription)
         }
@@ -244,6 +247,7 @@ class AIEnhancementService: ObservableObject {
         var currentDelay = initialDelay
 
         while retries < maxAttempts {
+            try Task.checkCancellation()
             do {
                 return try await makeRequest(
                     text: text,

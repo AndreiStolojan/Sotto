@@ -109,6 +109,9 @@ final class LocalCLIService {
         """
     }
 
+    /// Runs the template through a login shell. Prompts travel in environment variables, and
+    /// templates that do not reference them in arguments also receive the full prompt on stdin.
+    /// Cancelling the calling task terminates the command and its children.
     private func executeCommand(
         commandTemplate: String,
         systemPrompt: String,
@@ -116,85 +119,53 @@ final class LocalCLIService {
         fullPrompt: String,
         timeout: Double
     ) async throws -> String {
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-                process.arguments = ["-lc", commandTemplate]
+        var environment = ProcessInfo.processInfo.environment
+        environment["PATH"] = await ShellCommandEnvironment.resolvePreferredPATH(fallback: environment["PATH"])
+        environment["VOCE_SYSTEM_PROMPT"] = systemPrompt
+        environment["VOCE_USER_PROMPT"] = userPrompt
+        environment["VOCE_FULL_PROMPT"] = fullPrompt
 
-                var environment = ProcessInfo.processInfo.environment
-                environment["PATH"] = ShellCommandEnvironment.preferredPATH(fallback: environment["PATH"])
-                environment["VOCE_SYSTEM_PROMPT"] = systemPrompt
-                environment["VOCE_USER_PROMPT"] = userPrompt
-                environment["VOCE_FULL_PROMPT"] = fullPrompt
-                process.environment = environment
+        let usesArgumentPrompt =
+            commandTemplate == LocalCLITemplate.codex.commandTemplate
+            || commandTemplate == LocalCLITemplate.claude.commandTemplate
 
-                let usesArgumentPrompt =
-                    commandTemplate == LocalCLITemplate.codex.commandTemplate
-                    || commandTemplate == LocalCLITemplate.claude.commandTemplate
-                let inputPipe = usesArgumentPrompt ? nil : Pipe()
-                let outputPipe = Pipe()
-                let errorPipe = Pipe()
-                process.standardInput = inputPipe ?? FileHandle.nullDevice
-                process.standardOutput = outputPipe
-                process.standardError = errorPipe
-
-                do {
-                    try process.run()
-                } catch {
-                    continuation.resume(throwing: LocalCLIError.executionFailed(error.localizedDescription))
-                    return
-                }
-
-                if let inputPipe {
-                    if let inputData = fullPrompt.data(using: .utf8) {
-                        inputPipe.fileHandleForWriting.write(inputData)
-                    }
-                    try? inputPipe.fileHandleForWriting.close()
-                }
-
-                let semaphore = DispatchSemaphore(value: 0)
-                process.terminationHandler = { _ in
-                    semaphore.signal()
-                }
-
-                let waitResult = semaphore.wait(timeout: .now() + timeout)
-                if waitResult == .timedOut {
-                    if process.isRunning {
-                        process.terminate()
-                        _ = semaphore.wait(timeout: .now() + 2)
-                    }
-                    continuation.resume(throwing: LocalCLIError.timeout(seconds: timeout))
-                    return
-                }
-
-                let stdoutData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-                let stderrData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-
-                let stdout = Self.cleanOutput(String(data: stdoutData, encoding: .utf8) ?? "")
-                let stderr = Self.cleanOutput(String(data: stderrData, encoding: .utf8) ?? "")
-
-                if process.terminationStatus != 0 {
-                    let looksLikeCommandNotFound =
-                        process.terminationStatus == 127 || stderr.lowercased().contains("command not found")
-                    if looksLikeCommandNotFound {
-                        continuation.resume(
-                            throwing: LocalCLIError.commandNotFound(stderr.isEmpty ? commandTemplate : stderr))
-                    } else {
-                        continuation.resume(
-                            throwing: LocalCLIError.nonZeroExit(status: Int(process.terminationStatus), stderr: stderr))
-                    }
-                    return
-                }
-
-                guard !stdout.isEmpty else {
-                    continuation.resume(throwing: LocalCLIError.emptyOutput)
-                    return
-                }
-
-                continuation.resume(returning: stdout)
-            }
+        let output: ProcessRunner.Output
+        do {
+            output = try await ProcessRunner.run(
+                executableURL: URL(fileURLWithPath: "/bin/zsh"),
+                arguments: ["-lc", commandTemplate],
+                environment: environment,
+                standardInput: usesArgumentPrompt ? nil : Data(fullPrompt.utf8),
+                timeout: timeout
+            )
+        } catch ProcessRunner.Failure.timedOut {
+            throw LocalCLIError.timeout(seconds: timeout)
+        } catch ProcessRunner.Failure.launchFailed(let message) {
+            throw LocalCLIError.executionFailed(message)
         }
+
+        let stdout = Self.cleanOutput(output.stdoutString)
+        let stderr = Self.cleanOutput(output.stderrString)
+
+        guard output.succeeded else {
+            let status = Int(output.status)
+            let looksLikeCommandNotFound = status == 127 || stderr.lowercased().contains("command not found")
+            if looksLikeCommandNotFound {
+                throw LocalCLIError.commandNotFound(stderr.isEmpty ? commandTemplate : stderr)
+            }
+            throw LocalCLIError.nonZeroExit(status: status, stderr: stderr)
+        }
+
+        // Pasting a cut-off enhancement would silently lose dictated text.
+        guard !output.isStdoutTruncated else {
+            throw LocalCLIError.outputIncomplete
+        }
+
+        guard !stdout.isEmpty else {
+            throw LocalCLIError.emptyOutput
+        }
+
+        return stdout
     }
 
     private static func cleanOutput(_ value: String) -> String {
@@ -208,6 +179,7 @@ enum LocalCLIError: Error, LocalizedError {
     case timeout(seconds: Double)
     case nonZeroExit(status: Int, stderr: String)
     case emptyOutput
+    case outputIncomplete
     case executionFailed(String)
 
     var errorDescription: String? {
@@ -230,6 +202,8 @@ enum LocalCLIError: Error, LocalizedError {
                 format: String(localized: "Local CLI command failed with exit code %lld: %@"), Int64(status), stderr)
         case .emptyOutput:
             return String(localized: "Local CLI command returned empty output.")
+        case .outputIncomplete:
+            return String(localized: "Local CLI command output was too large or did not finish.")
         case .executionFailed(let message):
             return String(format: String(localized: "Failed to execute Local CLI command: %@"), message)
         }

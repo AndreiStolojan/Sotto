@@ -1,5 +1,4 @@
 {
-  "originHash" : "64ff7ce74c61f19790499483331a7f6776d40c6fd1bda5f8cbb2c3c93d8094f7",
   "pins" : [
     {
       "identity" : "axswift",
@@ -94,15 +93,6 @@
       "state" : {
         "revision" : "fb1c1ad99e8939a69fcfb613417d9635fb77ef42",
         "version" : "0.2.0-dev.856d7c1"
-      }
-    },
-    {
-      "identity" : "zip",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/marmelroy/Zip",
-      "state" : {
-        "revision" : "67fa55813b9e7b3b9acee9c0ae501def28746d76",
-        "version" : "2.1.2"
       }
     }
   ],

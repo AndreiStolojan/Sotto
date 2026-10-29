@@ -5,8 +5,9 @@ set -euo pipefail
 repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
 command -v rsvg-convert >/dev/null || { echo "Missing rsvg-convert: brew install librsvg" >&2; exit 1; }
 assets="$repo_dir/Voce/Assets.xcassets"
-beta_svg="$(mktemp -t sotto-beta-icon).svg"
-trap 'rm -f "$beta_svg"' EXIT
+icon_tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/sotto-beta-icon.XXXXXX")"
+beta_svg="$icon_tmp_dir/beta.svg"
+trap 'rm -rf "$icon_tmp_dir"' EXIT
 
 # Sotto Beta keeps the same artwork, with the light dots tinted the app's teal accent (#66D6BF).
 python3 - "$repo_dir/design/Voce-icon.svg" "$beta_svg" <<'EOF'

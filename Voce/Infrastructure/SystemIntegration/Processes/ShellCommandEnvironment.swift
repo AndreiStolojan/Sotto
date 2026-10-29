@@ -44,6 +44,25 @@ enum ShellCommandEnvironment {
         }
     }
 
+    /// Async form of `preferredPATH`. The first call may spend seconds in login shells, so it runs
+    /// on a dispatch queue instead of blocking a Swift concurrency thread.
+    static func resolvePreferredPATH(fallback: String?) async -> String {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(returning: preferredPATH(fallback: fallback))
+            }
+        }
+    }
+
+    /// Async form of `commandEnvironment`, for the same reason as `resolvePreferredPATH`.
+    static func resolveCommandEnvironment(additionalEnvironment: [String: String] = [:]) async -> [String: String] {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(returning: commandEnvironment(additionalEnvironment: additionalEnvironment))
+            }
+        }
+    }
+
     static func commandEnvironment(
         inheritedEnvironment: [String: String] = ProcessInfo.processInfo.environment,
         additionalEnvironment: [String: String] = [:]
@@ -81,6 +100,7 @@ enum ShellCommandEnvironment {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
         process.arguments = arguments
+        process.standardInput = FileHandle.nullDevice
 
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()

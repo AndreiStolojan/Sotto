@@ -226,35 +226,12 @@ actor AutoLearnPendingQueue {
 
     private func loadIfNeeded() throws {
         guard !queuedCorrectionsWereLoaded else { return }
-        guard fileManager.fileExists(atPath: queueFileURL.path) else {
-            queuedCorrectionsWereLoaded = true
-            return
-        }
-
-        let data = try Data(contentsOf: queueFileURL)
-        queuedCorrections = try Self.decodeCorrections(from: data)
+        queuedCorrections = try AutoLearnJSONArrayFile.load(
+            QueuedCorrection.self,
+            from: queueFileURL,
+            fileManager: fileManager
+        )
         queuedCorrectionsWereLoaded = true
-    }
-
-    /// Decodes entry by entry so one unreadable record cannot strand the whole
-    /// queue for the lifetime of the install.
-    private static func decodeCorrections(from data: Data) throws -> [QueuedCorrection] {
-        let decoder = JSONDecoder()
-        guard let records = try JSONSerialization.jsonObject(with: data) as? [Any] else {
-            throw DecodingError.dataCorrupted(
-                DecodingError.Context(
-                    codingPath: [],
-                    debugDescription: "Auto Learn queue file is not a JSON array"
-                )
-            )
-        }
-
-        return records.compactMap { record in
-            guard let recordData = try? JSONSerialization.data(withJSONObject: record) else {
-                return nil
-            }
-            return try? decoder.decode(QueuedCorrection.self, from: recordData)
-        }
     }
 
     private func save() throws {

@@ -1,7 +1,6 @@
 import Atomics
 import Foundation
 import SwiftUI
-import Zip
 import os
 
 // MARK: - WhisperModelFile
@@ -13,41 +12,8 @@ struct WhisperModelFile: Identifiable {
     var coreMLEncoderURL: URL?  // Path to the unzipped .mlmodelc directory
     var isCoreMLDownloaded: Bool { coreMLEncoderURL != nil }
 
-    var downloadURL: String {
-        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/\(filename)"
-    }
-
     var filename: String {
         "\(name).bin"
-    }
-
-    // Core ML related properties
-    var coreMLZipDownloadURL: String? {
-        // Only non-quantized models have Core ML versions
-        guard !name.contains("q5") && !name.contains("q8") else { return nil }
-        return "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/\(name)-encoder.mlmodelc.zip"
-    }
-
-    var coreMLEncoderDirectoryName: String? {
-        guard coreMLZipDownloadURL != nil else { return nil }
-        return "\(name)-encoder.mlmodelc"
-    }
-}
-
-// MARK: - Private download task delegate
-
-private class TaskDelegate: NSObject, URLSessionTaskDelegate {
-    private let continuation: CheckedContinuation<Void, Never>
-    private let finished = ManagedAtomic(false)
-
-    init(_ continuation: CheckedContinuation<Void, Never>) {
-        self.continuation = continuation
-    }
-
-    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if finished.exchange(true, ordering: .acquiring) == false {
-            continuation.resume()
-        }
     }
 }
 
@@ -100,6 +66,10 @@ class WhisperModelManager: ObservableObject {
     @Published var loadedWhisperModel: WhisperModelFile?
     @Published var isModelLoading = false
     private var activeDownloadTasks: [String: Task<Void, Never>] = [:]
+    private var activeProgressKeys: Set<String> = []
+    /// Incremented whenever the shared context is dropped, so stale loads can detect it.
+    private var contextGeneration = 0
+    private static let stagingDirectoryName = ".downloads"
 
     let modelsDirectory: URL
     let whisperPrompt = WhisperPrompt()
@@ -130,6 +100,11 @@ class WhisperModelManager: ObservableObject {
     }
 
     func loadAvailableModels() {
+        if activeDownloadTasks.isEmpty {
+            try? FileManager.default.removeItem(
+                at: modelsDirectory.appendingPathComponent(Self.stagingDirectoryName, isDirectory: true))
+        }
+
         do {
             let fileURLs = try FileManager.default.contentsOfDirectory(
                 at: modelsDirectory, includingPropertiesForKeys: nil)
@@ -144,41 +119,49 @@ class WhisperModelManager: ObservableObject {
 
     // MARK: - Model Loading
 
+    /// Loads the shared context unless one is already loaded or loading. A load that finishes after
+    /// `unloadModel` or `cleanupResources` ran is discarded instead of resurrecting the context.
     func loadModel(_ model: WhisperModelFile) async throws {
-        guard whisperContext == nil else { return }
+        guard whisperContext == nil, !isModelLoading else { return }
 
         isModelLoading = true
         defer { isModelLoading = false }
+        let generation = contextGeneration
 
+        let context: WhisperContext
         do {
-            whisperContext = try await WhisperContext.createContext(path: model.url.path)
-
+            context = try await WhisperContext.createContext(path: model.url.path)
             let currentPrompt =
                 UserDefaults.standard.string(forKey: "TranscriptionPrompt") ?? whisperPrompt.transcriptionPrompt
-            await whisperContext?.setPrompt(currentPrompt)
-
-            isModelLoaded = true
-            loadedWhisperModel = model
+            await context.setPrompt(currentPrompt)
         } catch {
             throw VoceEngineError.modelLoadFailed
         }
+
+        guard generation == contextGeneration, whisperContext == nil else { return }
+        whisperContext = context
+        isModelLoaded = true
+        loadedWhisperModel = model
     }
 
     // MARK: - Model Download & Management
 
-    private func downloadFileWithProgress(from url: URL, progressKey: String) async throws -> Data {
-        let destinationURL = modelsDirectory.appendingPathComponent(UUID().uuidString)
+    /// Downloads `url` into `directory` and returns the file, without reading it into memory.
+    /// Progress is published under `progressKey` only while this download is active.
+    private func downloadFile(from url: URL, into directory: URL, progressKey: String) async throws -> URL {
+        let destinationURL = directory.appendingPathComponent(UUID().uuidString)
         let requestState = DownloadRequestState()
-        defer { try? FileManager.default.removeItem(at: destinationURL) }
+        activeProgressKeys.insert(progressKey)
+        defer { activeProgressKeys.remove(progressKey) }
 
         return try await withTaskCancellationHandler(
             operation: {
                 try Task.checkCancellation()
                 return try await withCheckedThrowingContinuation {
-                    (continuation: CheckedContinuation<Data, Error>) in
+                    (continuation: CheckedContinuation<URL, Error>) in
                     let finished = ManagedAtomic(false)
 
-                    func finishOnce(_ result: Result<Data, Error>) {
+                    func finishOnce(_ result: Result<URL, Error>) {
                         requestState.finish()
                         if finished.exchange(true, ordering: .acquiring) == false {
                             continuation.resume(with: result)
@@ -202,11 +185,10 @@ class WhisperModelManager: ObservableObject {
                             return
                         }
 
+                        // URLSession deletes tempURL when this handler returns, so move it now.
                         do {
                             try FileManager.default.moveItem(at: tempURL, to: destinationURL)
-                            let data = try Data(contentsOf: destinationURL, options: .mappedIfSafe)
-                            finishOnce(.success(data))
-                            try? FileManager.default.removeItem(at: destinationURL)
+                            finishOnce(.success(destinationURL))
                         } catch {
                             finishOnce(.failure(error))
                         }
@@ -225,6 +207,8 @@ class WhisperModelManager: ObservableObject {
                             lastProgressValue = currentProgress
 
                             DispatchQueue.main.async {
+                                // A late update must not re-create a key the finished download removed.
+                                guard self.activeProgressKeys.contains(progressKey) else { return }
                                 self.downloadProgress[progressKey] = currentProgress
                             }
                         }
@@ -247,8 +231,7 @@ class WhisperModelManager: ObservableObject {
     }
 
     func downloadModel(_ model: WhisperModel) async {
-        guard let url = URL(string: model.downloadURL) else { return }
-        await performModelDownload(model, url)
+        await performModelDownload(model)
     }
 
     func startDownload(_ model: WhisperModel) {
@@ -265,144 +248,111 @@ class WhisperModelManager: ObservableObject {
         activeDownloadTasks[model.name]?.cancel()
     }
 
-    private func performModelDownload(_ model: WhisperModel, _ url: URL) async {
-        var committedMainModel: WhisperModelFile?
+    /// Downloads the main model, then the optional Core ML encoder, from the pinned catalog. Files land
+    /// in a private staging directory and must match their published size and SHA-256 first, so a
+    /// cancelled, failed or tampered download never replaces installed files. The main model works on
+    /// its own, so it stays listed when only the Core ML encoder fails.
+    private func performModelDownload(_ model: WhisperModel) async {
+        let stagingDirectory = modelsDirectory
+            .appendingPathComponent(Self.stagingDirectoryName, isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: stagingDirectory)
+            downloadProgress.removeValue(forKey: model.name + "_main")
+            downloadProgress.removeValue(forKey: model.name + "_coreml")
+        }
 
+        var whisperModel: WhisperModelFile
+        let catalogEntry = WhisperModelCatalog.entry(for: model.name)
         do {
-            var whisperModel = try await downloadMainModel(model, from: url)
-            committedMainModel = whisperModel
-            try Task.checkCancellation()
-
-            if let coreMLZipURL = whisperModel.coreMLZipDownloadURL,
-                let coreMLURL = URL(string: coreMLZipURL)
-            {
-                whisperModel = try await downloadAndSetupCoreMLModel(for: whisperModel, from: coreMLURL)
-            }
-
-            try Task.checkCancellation()
-            availableModels.append(whisperModel)
-            self.downloadProgress.removeValue(forKey: model.name + "_main")
-
-            onModelsChanged?()
-
-            if shouldWarmup(model) {
-                WhisperModelWarmupCoordinator.shared.scheduleWarmup(for: model, whisperModelManager: self)
-            }
+            guard let catalogEntry else { throw URLError(.unsupportedURL) }
+            try FileManager.default.createDirectory(at: stagingDirectory, withIntermediateDirectories: true)
+            whisperModel = try await downloadMainModel(
+                model, artifact: catalogEntry.model, stagingDirectory: stagingDirectory)
         } catch is CancellationError {
-            removePartialDownload(for: model, preserveMainModel: committedMainModel != nil)
-            if let committedMainModel,
-                !availableModels.contains(where: { $0.name == committedMainModel.name })
-            {
-                availableModels.append(committedMainModel)
-                onModelsChanged?()
-            }
-            handleModelDownloadError(model, CancellationError())
+            return
         } catch {
-            handleModelDownloadError(model, error)
+            logError("Model download failed: \(model.name)", error)
+            NotificationManager.shared.showNotification(
+                title: String(format: String(localized: "%@ download failed"), model.displayName),
+                type: .error
+            )
+            return
+        }
+
+        if let encoder = catalogEntry?.coreMLEncoder {
+            do {
+                try Task.checkCancellation()
+                whisperModel.coreMLEncoderURL = try await downloadCoreMLEncoder(
+                    for: whisperModel,
+                    encoder: encoder,
+                    stagingDirectory: stagingDirectory
+                )
+            } catch is CancellationError {
+                // Keep the committed main model; the Core ML encoder is optional.
+            } catch {
+                logError("Core ML encoder install failed: \(model.name)", error)
+                NotificationManager.shared.showNotification(
+                    title: String(
+                        format: String(localized: "Core ML download failed for %@. The model still works without it."),
+                        model.displayName),
+                    type: .warning
+                )
+            }
+        }
+
+        availableModels.removeAll { $0.name == whisperModel.name }
+        availableModels.append(whisperModel)
+        onModelsChanged?()
+
+        if !Task.isCancelled, shouldWarmup(model) {
+            WhisperModelWarmupCoordinator.shared.scheduleWarmup(for: model, whisperModelManager: self)
         }
     }
 
-    private func removePartialDownload(for model: WhisperModel, preserveMainModel: Bool) {
-        if !preserveMainModel {
-            try? FileManager.default.removeItem(at: modelsDirectory.appendingPathComponent(model.filename))
-        }
-        try? FileManager.default.removeItem(
-            at: modelsDirectory.appendingPathComponent("\(model.name)-encoder.mlmodelc.zip")
-        )
-        try? FileManager.default.removeItem(
-            at: modelsDirectory.appendingPathComponent("\(model.name)-encoder.mlmodelc")
-        )
-    }
-
-    private func downloadMainModel(_ model: WhisperModel, from url: URL) async throws -> WhisperModelFile {
-        let progressKeyMain = model.name + "_main"
-        let data = try await downloadFileWithProgress(from: url, progressKey: progressKeyMain)
+    private func downloadMainModel(
+        _ model: WhisperModel, artifact: WhisperModelCatalog.Artifact, stagingDirectory: URL
+    ) async throws -> WhisperModelFile {
+        let downloadedURL = try await downloadFile(
+            from: artifact.url, into: stagingDirectory, progressKey: model.name + "_main")
+        try await WhisperModelCatalog.verify(downloadedURL, matches: artifact)
         try Task.checkCancellation()
 
         let destinationURL = modelsDirectory.appendingPathComponent(model.filename)
-        try data.write(to: destinationURL, options: .atomic)
-        try Task.checkCancellation()
-
+        try WhisperCoreMLArchive.replaceItem(
+            at: destinationURL, with: downloadedURL, backupDirectory: stagingDirectory)
         return WhisperModelFile(name: model.name, url: destinationURL)
     }
 
-    private func downloadAndSetupCoreMLModel(for model: WhisperModelFile, from url: URL) async throws
-        -> WhisperModelFile
-    {
-        let progressKeyCoreML = model.name + "_coreml"
-        let coreMLData = try await downloadFileWithProgress(from: url, progressKey: progressKeyCoreML)
+    private func downloadCoreMLEncoder(
+        for model: WhisperModelFile,
+        encoder: WhisperModelCatalog.CoreMLEncoder,
+        stagingDirectory: URL
+    ) async throws -> URL {
+        let zipURL = try await downloadFile(
+            from: encoder.archive.url, into: stagingDirectory, progressKey: model.name + "_coreml")
+        try await WhisperModelCatalog.verify(zipURL, matches: encoder.archive)
         try Task.checkCancellation()
 
-        let coreMLZipPath = modelsDirectory.appendingPathComponent("\(model.name)-encoder.mlmodelc.zip")
-        try coreMLData.write(to: coreMLZipPath, options: .atomic)
-        try Task.checkCancellation()
-
-        return try await unzipAndSetupCoreMLModel(for: model, zipPath: coreMLZipPath, progressKey: progressKeyCoreML)
-    }
-
-    private func unzipAndSetupCoreMLModel(for model: WhisperModelFile, zipPath: URL, progressKey: String) async throws
-        -> WhisperModelFile
-    {
-        let coreMLDestination = modelsDirectory.appendingPathComponent("\(model.name)-encoder.mlmodelc")
-
-        try? FileManager.default.removeItem(at: coreMLDestination)
-        try Task.checkCancellation()
-        try await unzipCoreMLFile(zipPath, to: modelsDirectory)
-        try Task.checkCancellation()
-        return try verifyAndCleanupCoreMLFiles(model, coreMLDestination, zipPath, progressKey)
-    }
-
-    private func unzipCoreMLFile(_ zipPath: URL, to destination: URL) async throws {
-        let finished = ManagedAtomic(false)
-
-        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            func finishOnce(_ result: Result<Void, Error>) {
-                if finished.exchange(true, ordering: .acquiring) == false {
-                    continuation.resume(with: result)
-                }
-            }
-
-            do {
-                try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-                try Zip.unzipFile(zipPath, destination: destination, overwrite: true, password: nil)
-                finishOnce(.success(()))
-            } catch {
-                finishOnce(.failure(error))
-            }
-        }
-    }
-
-    private func verifyAndCleanupCoreMLFiles(
-        _ model: WhisperModelFile, _ destination: URL, _ zipPath: URL, _ progressKey: String
-    ) throws -> WhisperModelFile {
-        var model = model
-
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: destination.path, isDirectory: &isDirectory), isDirectory.boolValue
-        else {
-            try? FileManager.default.removeItem(at: zipPath)
-            throw VoceEngineError.unzipFailed
-        }
-
-        try? FileManager.default.removeItem(at: zipPath)
-        model.coreMLEncoderURL = destination
-        self.downloadProgress.removeValue(forKey: progressKey)
-
-        return model
+        return try await WhisperCoreMLArchive.install(
+            zipURL: zipURL,
+            archiveDirectoryName: encoder.archiveDirectoryName,
+            installedName: WhisperModelCatalog.installedEncoderDirectoryName(for: model.name),
+            stagingDirectory: stagingDirectory,
+            destinationDirectory: modelsDirectory
+        )
     }
 
     private func shouldWarmup(_ model: WhisperModel) -> Bool {
         !model.name.contains("q5") && !model.name.contains("q8")
     }
 
-    private func handleModelDownloadError(_ model: WhisperModel, _ error: Error) {
-        self.downloadProgress.removeValue(forKey: model.name + "_main")
-        self.downloadProgress.removeValue(forKey: model.name + "_coreml")
-    }
-
     func deleteModel(_ model: WhisperModelFile) async {
         do {
             try FileManager.default.removeItem(at: model.url)
+            if loadedWhisperModel?.name == model.name {
+                unloadModel()
+            }
 
             if let coreMLURL = model.coreMLEncoderURL {
                 try? FileManager.default.removeItem(at: coreMLURL)
@@ -422,12 +372,12 @@ class WhisperModelManager: ObservableObject {
         }
     }
 
+    /// Drops the shared context. whisper.cpp memory is freed once in-flight transcriptions that
+    /// still hold the context finish, instead of being released underneath them.
     func unloadModel() {
-        Task {
-            await whisperContext?.releaseResources()
-            whisperContext = nil
-            isModelLoaded = false
-        }
+        contextGeneration += 1
+        whisperContext = nil
+        isModelLoaded = false
     }
 
     func clearDownloadedModels() async {
@@ -447,9 +397,7 @@ class WhisperModelManager: ObservableObject {
     /// Does NOT call serviceRegistry.cleanup() — that is VoceEngine's responsibility.
     func cleanupResources() async {
         logger.notice("WhisperModelManager.cleanupResources: releasing whisper context")
-        await whisperContext?.releaseResources()
-        whisperContext = nil
-        isModelLoaded = false
+        unloadModel()
         logger.notice("WhisperModelManager.cleanupResources: completed")
     }
 

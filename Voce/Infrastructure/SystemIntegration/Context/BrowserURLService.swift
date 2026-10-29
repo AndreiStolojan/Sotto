@@ -109,47 +109,19 @@ class BrowserURLService {
             throw BrowserURLError.browserNotRunning
         }
 
-        let task = Process()
-        task.launchPath = "/usr/bin/osascript"
-        task.arguments = [scriptURL.path]
-
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = pipe
-
+        let output: ProcessRunner.Output
         do {
-            logger.debug("▶️ Executing AppleScript for \(browser.displayName, privacy: .public)")
-            try task.run()
-            try await waitUntilExit(task, browser: browser)
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
-                if output.isEmpty {
-                    logger.error("❌ Empty output from AppleScript for \(browser.displayName, privacy: .public)")
-                    throw BrowserURLError.noActiveTab
-                }
-
-                // Check if output contains error messages
-                if output.lowercased().contains("error") {
-                    logger.error(
-                        "❌ AppleScript error for \(browser.displayName, privacy: .public): \(output, privacy: .public)")
-                    throw BrowserURLError.executionFailed
-                }
-
-                logger.debug(
-                    "✅ Successfully retrieved URL from \(browser.displayName, privacy: .public): \(output, privacy: .public)"
-                )
-                return output
-            } else {
-                logger.error("❌ Failed to decode output from AppleScript for \(browser.displayName, privacy: .public)")
-                throw BrowserURLError.executionFailed
-            }
-        } catch let error as BrowserURLError {
-            throw error
+            output = try await ProcessRunner.run(
+                executableURL: URL(fileURLWithPath: "/usr/bin/osascript"),
+                arguments: [scriptURL.path],
+                timeout: scriptTimeout,
+                outputLimit: 64 * 1024,
+                terminationGracePeriod: 0.5
+            )
+        } catch ProcessRunner.Failure.timedOut {
+            logger.error("❌ AppleScript timed out for \(browser.displayName, privacy: .public)")
+            throw BrowserURLError.executionTimedOut
         } catch is CancellationError {
-            if task.isRunning {
-                task.terminate()
-            }
             throw CancellationError()
         } catch {
             logger.error(
@@ -157,19 +129,23 @@ class BrowserURLService {
             )
             throw BrowserURLError.executionFailed
         }
-    }
 
-    private func waitUntilExit(_ task: Process, browser: BrowserType) async throws {
-        let timeoutDate = Date().addingTimeInterval(scriptTimeout)
-        while task.isRunning {
-            if Date() >= timeoutDate {
-                task.terminate()
-                logger.error("❌ AppleScript timed out for \(browser.displayName, privacy: .public)")
-                throw BrowserURLError.executionTimedOut
-            }
-
-            try await Task.sleep(nanoseconds: 50_000_000)
+        // osascript reports script errors, such as a missing window, on stderr with a nonzero status.
+        guard output.succeeded else {
+            logger.error(
+                "❌ AppleScript error for \(browser.displayName, privacy: .public) status=\(output.status, privacy: .public): \(output.stderrString, privacy: .private)"
+            )
+            throw BrowserURLError.executionFailed
         }
+
+        let url = output.stdoutString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !url.isEmpty else {
+            logger.error("❌ Empty output from AppleScript for \(browser.displayName, privacy: .public)")
+            throw BrowserURLError.noActiveTab
+        }
+
+        logger.debug("✅ Retrieved URL from \(browser.displayName, privacy: .public): \(url, privacy: .private)")
+        return url
     }
 
     func isRunning(_ browser: BrowserType) -> Bool {

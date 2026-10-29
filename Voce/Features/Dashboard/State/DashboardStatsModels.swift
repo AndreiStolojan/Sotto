@@ -479,8 +479,29 @@ final class DashboardStatsCache: @unchecked Sendable {
     private var summary: DashboardStatsSummary?
     private var snapshotMetadata: DashboardStatsSnapshotStore.Metadata?
     private var isStale = false
+    private var metricChangeObserver: NSObjectProtocol?
 
     private init() {}
+
+    /// Marks the snapshot stale on every session metric change, including while
+    /// the Dashboard is closed, so reopening it refreshes the totals.
+    func observeMetricChanges() {
+        lock.lock()
+        defer { lock.unlock() }
+        guard metricChangeObserver == nil else { return }
+        metricChangeObserver = NotificationCenter.default.addObserver(
+            forName: .sessionMetricsDidChange,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            self?.markStale()
+        }
+    }
+
+    /// Read before loading a summary and pass to `update(_:computedAtStaleGeneration:)`.
+    func currentStaleGeneration() -> UInt64 {
+        snapshotStore.currentStaleGeneration()
+    }
 
     func currentSummary() -> DashboardStatsSummary? {
         lock.lock()
@@ -512,13 +533,17 @@ final class DashboardStatsCache: @unchecked Sendable {
     }
 
     @discardableResult
-    func update(_ summary: DashboardStatsSummary) -> DashboardStatsSnapshotStore.Metadata {
-        let metadata = snapshotStore.saveSummary(summary)
+    func update(
+        _ summary: DashboardStatsSummary,
+        computedAtStaleGeneration staleGeneration: UInt64
+    ) -> DashboardStatsSnapshotStore.Metadata {
+        let metadata = snapshotStore.saveSummary(summary, computedAtStaleGeneration: staleGeneration)
 
         lock.lock()
         self.summary = summary
         self.snapshotMetadata = metadata
-        self.isStale = false
+        // A change that arrived during the load keeps the new snapshot stale.
+        self.isStale = snapshotStore.currentStaleGeneration() != staleGeneration
         lock.unlock()
 
         return metadata
@@ -535,9 +560,10 @@ final class DashboardStatsCache: @unchecked Sendable {
     func shouldRefreshSnapshotAutomatically() -> Bool {
         lock.lock()
         let metadata = snapshotMetadata
+        let isStale = isStale
         lock.unlock()
 
-        guard let metadata else {
+        guard let metadata, !isStale else {
             return true
         }
 

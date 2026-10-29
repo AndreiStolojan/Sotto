@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import SwiftData
 
+/// Exports selected History entries as CSV; the header is a contract with `scripts/benchmark.py`.
 class VoceCSVExportService {
 
     func exportTranscriptionsToCSV(transcriptions: [Transcription]) {
@@ -27,12 +28,12 @@ class VoceCSVExportService {
             "Original Transcript,Enhanced Transcript,Enhancement Model,Prompt Name,Transcription Model,Mode,Enhancement Time,Transcription Time,Timestamp,Duration\n"
 
         for transcription in transcriptions {
-            let originalText = escapeCSVString(transcription.text)
-            let enhancedText = escapeCSVString(transcription.enhancedText ?? "")
-            let enhancementModel = escapeCSVString(transcription.aiEnhancementModelName ?? "")
-            let promptName = escapeCSVString(transcription.promptName ?? "")
-            let transcriptionModel = escapeCSVString(transcription.transcriptionModelName ?? "")
-            let mode = escapeCSVString(transcription.modeName ?? "")
+            let originalText = CSVField.escape(transcription.text)
+            let enhancedText = CSVField.escape(transcription.enhancedText ?? "")
+            let enhancementModel = CSVField.escape(transcription.aiEnhancementModelName ?? "")
+            let promptName = CSVField.escape(transcription.promptName ?? "")
+            let transcriptionModel = CSVField.escape(transcription.transcriptionModelName ?? "")
+            let mode = CSVField.escape(transcription.modeName ?? "")
             let enhancementTime = transcription.enhancementDuration ?? 0
             let transcriptionTime = transcription.transcriptionDuration ?? 0
             let timestamp = transcription.timestamp.ISO8601Format()
@@ -45,13 +46,4 @@ class VoceCSVExportService {
 
         return csvString
     }
-
-    private func escapeCSVString(_ string: String) -> String {
-        let escapedString = string.replacingOccurrences(of: "\"", with: "\"\"")
-        if escapedString.contains(",") || escapedString.contains("\n") {
-            return "\"\(escapedString)\""
-        }
-        return escapedString
-    }
-
 }

@@ -32,6 +32,8 @@ playground.xcworkspace
 
 .build/
 build/
+.benchmark-private/
+__pycache__/
 
 # CocoaPods
 #

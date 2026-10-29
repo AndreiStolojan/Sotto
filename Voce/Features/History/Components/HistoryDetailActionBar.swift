@@ -290,9 +290,7 @@ struct HistoryDetailActionBar: View {
 
         Task {
             do {
-                transcription.aiEnhancementModelName =
-                    configuration.modelName ?? configuration.provider?.defaultModel
-                transcription.promptName = configuration.prompt?.title
+                // `selectedPromptOverride` labels the work in progress; the record changes only on success.
                 let result = try await enhancementService.enhance(
                     transcription.text,
                     configuration: configuration

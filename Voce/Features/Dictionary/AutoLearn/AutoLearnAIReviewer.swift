@@ -358,10 +358,16 @@ final class AutoLearnAIReviewer: @unchecked Sendable {
             return matches
         }
 
+        // The model controls how many terms arrive, and backtracking over many
+        // short terms grows factorially on the main actor. Past the budget the
+        // decisions count as overlapping, which leaves the candidate unresolved.
+        var remainingSteps = 10_000
         func assign(_ termIndex: Int, occupied: [NSRange]) -> Bool {
             guard termIndex < rangesByTerm.count else { return true }
             for range in rangesByTerm[termIndex]
             where occupied.allSatisfy({ NSIntersectionRange($0, range).length == 0 }) {
+                remainingSteps -= 1
+                guard remainingSteps > 0 else { return false }
                 if assign(termIndex + 1, occupied: occupied + [range]) {
                     return true
                 }

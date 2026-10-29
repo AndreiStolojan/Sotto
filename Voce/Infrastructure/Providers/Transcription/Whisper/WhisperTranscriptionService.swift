@@ -1,13 +1,14 @@
-import AVFoundation
+import FluidAudio
 import Foundation
 import os
 
+/// Transcribes with whisper.cpp. Reuses the model provider's loaded context when it matches the
+/// requested model; otherwise loads a private context that lives only for this request.
 class WhisperTranscriptionService: TranscriptionService {
-
-    private var whisperContext: WhisperContext?
     private let logger = Logger(subsystem: "ro.andrei.Voce", category: "WhisperTranscriptionService")
     private let modelsDirectory: URL
     private weak var modelProvider: (any WhisperModelProvider)?
+    private let audioConverter = AudioConverter()
 
     init(modelsDirectory: URL, modelProvider: (any WhisperModelProvider)? = nil) {
         self.modelsDirectory = modelsDirectory
@@ -23,73 +24,53 @@ class WhisperTranscriptionService: TranscriptionService {
 
         logger.notice("Initiating local transcription for model: \(model.displayName, privacy: .public)")
 
-        // Check if the required model is already loaded in the model provider
+        let whisperContext = try await resolveContext(for: model)
+
+        // Decode and resample any supported file to 16 kHz mono Float32 instead of assuming a
+        // 44-byte PCM16 WAV header. Core Audio WAV files can carry extra chunks before the samples.
+        let samples = try audioConverter.resampleAudioFile(audioURL)
+        try Task.checkCancellation()
+
+        guard
+            let text = await whisperContext.transcribe(
+                samples: samples,
+                language: context.language,
+                prompt: context.prompt ?? ""
+            )
+        else {
+            logger.error("❌ Core transcription engine failed (whisper_full).")
+            throw VoceEngineError.whisperCoreFailed
+        }
+
+        logger.notice("Whisper transcription completed successfully.")
+        return text
+    }
+
+    /// The shared context stays owned by the model provider. A private context is freed when the
+    /// last reference to it goes away at the end of the request.
+    private func resolveContext(for model: any TranscriptionModel) async throws -> WhisperContext {
         if let provider = modelProvider,
             await provider.isModelLoaded,
             let loadedContext = await provider.whisperContext,
             await provider.loadedWhisperModel?.name == model.name
         {
-
             logger.notice("Using already loaded model: \(model.name, privacy: .public)")
-            whisperContext = loadedContext
-        } else {
-            // Resolve the on-disk URL using the provider's availableModels (covers imports)
-            let resolvedURL: URL? = await modelProvider?.availableModels.first(where: { $0.name == model.name })?.url
-            guard let modelURL = resolvedURL, FileManager.default.fileExists(atPath: modelURL.path) else {
-                logger.error("❌ Model file not found for: \(model.name, privacy: .public)")
-                throw VoceEngineError.modelLoadFailed
-            }
-
-            logger.notice("Loading model: \(model.name, privacy: .public)")
-            do {
-                whisperContext = try await WhisperContext.createContext(path: modelURL.path)
-            } catch {
-                logger.error("❌ Failed to load model: \(model.name, privacy: .public) - \(error, privacy: .public)")
-                throw VoceEngineError.modelLoadFailed
-            }
+            return loadedContext
         }
 
-        guard let whisperContext = whisperContext else {
-            logger.error("❌ Cannot transcribe: Model could not be loaded")
+        // Resolve the on-disk URL using the provider's availableModels (covers imports)
+        let resolvedURL: URL? = await modelProvider?.availableModels.first(where: { $0.name == model.name })?.url
+        guard let modelURL = resolvedURL, FileManager.default.fileExists(atPath: modelURL.path) else {
+            logger.error("❌ Model file not found for: \(model.name, privacy: .public)")
             throw VoceEngineError.modelLoadFailed
         }
 
-        // Read audio data
-        let data = try readAudioSamples(audioURL)
-
-        // Set prompt
-        await whisperContext.setLanguage(context.language)
-        await whisperContext.setPrompt(context.prompt ?? "")
-
-        // Transcribe
-        let success = await whisperContext.fullTranscribe(samples: data)
-
-        guard success else {
-            logger.error("❌ Core transcription engine failed (whisper_full).")
-            throw VoceEngineError.whisperCoreFailed
+        logger.notice("Loading model: \(model.name, privacy: .public)")
+        do {
+            return try await WhisperContext.createContext(path: modelURL.path)
+        } catch {
+            logger.error("❌ Failed to load model: \(model.name, privacy: .public) - \(error, privacy: .public)")
+            throw VoceEngineError.modelLoadFailed
         }
-
-        let text = await whisperContext.getTranscription()
-
-        logger.notice("Whisper transcription completed successfully.")
-
-        // Only release resources if we created a new context (not using the shared one)
-        if await modelProvider?.whisperContext !== whisperContext {
-            await whisperContext.releaseResources()
-            self.whisperContext = nil
-        }
-
-        return text
-    }
-
-    private func readAudioSamples(_ url: URL) throws -> [Float] {
-        let data = try Data(contentsOf: url)
-        let floats = stride(from: 44, to: data.count, by: 2).map {
-            return data[$0..<$0 + 2].withUnsafeBytes {
-                let short = Int16(littleEndian: $0.load(as: Int16.self))
-                return max(-1.0, min(Float(short) / 32767.0, 1.0))
-            }
-        }
-        return floats
     }
 }

@@ -22,12 +22,10 @@ Versions are pinned in `Voce.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
 | [SelectedTextKit](https://github.com/Beingpax/SelectedTextKit), fork of [tisfeng/SelectedTextKit](https://github.com/tisfeng/SelectedTextKit) | MIT |
 | [mediaremote-adapter](https://github.com/ejbills/mediaremote-adapter) by ejbills, based on [ungive/mediaremote-adapter](https://github.com/ungive/mediaremote-adapter) | No license file; ungive's project is BSD 3-Clause |
 | [swift-markdown-ui](https://github.com/gonzalezreal/swift-markdown-ui), [NetworkImage](https://github.com/gonzalezreal/NetworkImage) | MIT |
-| [Zip](https://github.com/marmelroy/Zip) | MIT |
 | [AXSwift](https://github.com/tisfeng/AXSwift) | MIT |
 | [KeySender](https://github.com/jordanbaird/KeySender) | MIT |
 | [swift-cmark](https://github.com/swiftlang/swift-cmark) | BSD 2-Clause and MIT |
 | [swift-atomics](https://github.com/apple/swift-atomics) | Apache 2.0 |
-| minizip, vendored in Zip | zlib |
 
 ## Downloaded at build time
 

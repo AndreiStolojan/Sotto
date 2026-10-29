@@ -14,8 +14,18 @@ final class MediaController: ObservableObject {
         didSet { UserDefaults.standard.set(isSystemMuteEnabled, forKey: "isSystemMuteEnabled") }
     }
 
-    @Published var audioResumptionDelay: Double = UserDefaults.standard.double(forKey: "audioResumptionDelay") {
-        didSet { UserDefaults.standard.set(audioResumptionDelay, forKey: "audioResumptionDelay") }
+    /// Seconds to wait before unmuting or resuming media, always within `SettingsValueLimits`.
+    @Published var audioResumptionDelay: Double = SettingsValueLimits.clamped(
+        UserDefaults.standard.double(forKey: "audioResumptionDelay"),
+        to: SettingsValueLimits.audioResumptionDelay
+    ) {
+        didSet {
+            let delay = SettingsValueLimits.clamped(audioResumptionDelay, to: SettingsValueLimits.audioResumptionDelay)
+            if delay != audioResumptionDelay {
+                audioResumptionDelay = delay
+            }
+            UserDefaults.standard.set(delay, forKey: "audioResumptionDelay")
+        }
     }
 
     private init() {}

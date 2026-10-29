@@ -31,7 +31,6 @@ PACKAGES = [
     ("NetworkImage", "used by MarkdownUI", "NetworkImage/LICENSE"),
     ("swift-cmark", "used by MarkdownUI", "swift-cmark/COPYING"),
     ("swift-atomics", "thread-safe counters", "swift-atomics/LICENSE.txt"),
-    ("Zip", "settings backups", "Zip/LICENSE"),
 ]
 
 # (title, where it is used, pinned URL)
@@ -39,9 +38,6 @@ REMOTE = [
     ("mediaremote-adapter (ungive)", "pausing media while recording. Sotto uses ejbills/mediaremote-adapter, a Swift wrapper "
      "that ships no license file and is based on ungive's BSD 3-Clause project; ungive's license follows",
      "https://raw.githubusercontent.com/ungive/mediaremote-adapter/797729d/LICENSE"),
-    ("minizip (inside Zip)", "Copyright (C) 1998-2010 Gilles Vollant, (C) 2009-2010 Mathias Svensson, "
-     "(C) 2010-2014 Nathan Moinvaziri. Distributed under the zlib license, whose text follows",
-     "https://raw.githubusercontent.com/madler/zlib/v1.3.1/LICENSE"),
     ("whisper.cpp", "Whisper speech recognition, the prebuilt v1.8.2 XCFramework",
      "https://raw.githubusercontent.com/ggml-org/whisper.cpp/v1.8.2/LICENSE"),
     ("Silero VAD", "Voce/Resources/models/ggml-silero-v5.1.2.bin, voice detection for Whisper",

@@ -396,6 +396,12 @@ class VoceEngine: NSObject, ObservableObject {
 
                         } catch {
                             activeModeTask.cancel()
+                            // Cancel, stop or a newer start already owns the session, its file and state.
+                            // Cleaning up here would delete audio a running pipeline still reads.
+                            guard self.activeRecordingStartID == startID else {
+                                self.logger.notice("Ignoring failure from a superseded recording start: \(error, privacy: .public)")
+                                return
+                            }
                             self.logger.error("Recording failed to start: \(error, privacy: .public)")
                             let audioFailure = self.recordingAudioFailure(for: error)
                             if audioFailure == nil {

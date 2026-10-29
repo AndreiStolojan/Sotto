@@ -194,7 +194,7 @@ final class CoreAudioRecorder: @unchecked Sendable {
             try startAudioUnit()
         } catch {
             isRecording = false
-            recordingActive.store(false, ordering: .releasing)
+            recordingActive.store(false, ordering: .sequentiallyConsistent)
             closeOutputFile()
             recordingURL = nil
             teardownPreparedAudioUnit()
@@ -210,7 +210,7 @@ final class CoreAudioRecorder: @unchecked Sendable {
 
         let wasRecording = isRecording
         isRecording = false
-        recordingActive.store(false, ordering: .releasing)
+        recordingActive.store(false, ordering: .sequentiallyConsistent)
 
         if wasRecording, let unit = audioUnit {
             let stopStatus = AudioOutputUnitStop(unit)
@@ -262,7 +262,7 @@ final class CoreAudioRecorder: @unchecked Sendable {
             "🎙️ Switching recording device from \(oldDeviceID, privacy: .public) to \(newDeviceID, privacy: .public)")
 
         // Step 1: Stop the AudioUnit (but keep file open)
-        recordingActive.store(false, ordering: .releasing)
+        recordingActive.store(false, ordering: .sequentiallyConsistent)
         var status = AudioOutputUnitStop(unit)
         if status != noErr {
             logger.warning("🎙️ Warning: AudioOutputUnitStop returned \(status, privacy: .public)")
@@ -690,7 +690,7 @@ final class CoreAudioRecorder: @unchecked Sendable {
         let status = AudioOutputUnitStart(audioUnit)
         if status != noErr {
             isRecording = false
-            recordingActive.store(false, ordering: .releasing)
+            recordingActive.store(false, ordering: .sequentiallyConsistent)
             logger.error("Failed to start AudioUnit: \(status, privacy: .public)")
             throw CoreAudioRecorderError.failedToStart(status: status)
         }
@@ -720,7 +720,7 @@ final class CoreAudioRecorder: @unchecked Sendable {
     }
 
     private func teardownPreparedAudioUnit() {
-        recordingActive.store(false, ordering: .releasing)
+        recordingActive.store(false, ordering: .sequentiallyConsistent)
         if let unit = audioUnit {
             AudioOutputUnitStop(unit)
             waitForRenderCallbacksToFinish()
@@ -789,13 +789,15 @@ final class CoreAudioRecorder: @unchecked Sendable {
         inNumberFrames: UInt32
     ) -> OSStatus {
 
-        renderCallbacksInFlight.wrappingIncrement(ordering: .acquiringAndReleasing)
+        // Stopping stores `recordingActive = false` and then waits for this counter to reach zero.
+        // Both sides are sequentially consistent so neither can miss the other on weakly ordered CPUs.
+        renderCallbacksInFlight.wrappingIncrement(ordering: .sequentiallyConsistent)
         defer {
             renderCallbacksInFlight.wrappingDecrement(ordering: .acquiringAndReleasing)
         }
 
         guard let audioUnit = audioUnit,
-            recordingActive.load(ordering: .acquiring)
+            recordingActive.load(ordering: .sequentiallyConsistent)
         else {
             return noErr
         }
@@ -973,7 +975,7 @@ final class CoreAudioRecorder: @unchecked Sendable {
     }
 
     private func waitForRenderCallbacksToFinish() {
-        while renderCallbacksInFlight.load(ordering: .acquiring) > 0 {
+        while renderCallbacksInFlight.load(ordering: .sequentiallyConsistent) > 0 {
             Thread.sleep(forTimeInterval: 0.001)
         }
     }

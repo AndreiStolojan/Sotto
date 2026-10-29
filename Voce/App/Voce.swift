@@ -89,6 +89,7 @@ struct VoceApp: App {
         }
 
         container = resolvedContainer
+        DashboardStatsCache.shared.observeMetricChanges()
         DictionaryService.cleanUpDictionaryContent(context: resolvedContainer.mainContext, source: "launch")
 
         // Initialize services with proper sharing of instances

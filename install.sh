@@ -13,6 +13,7 @@ cache_root="$HOME/Library/Caches/Sotto"
 cache_marker=.sotto-installer
 # Set in main and used by the install functions and the exit trap.
 app_name="" bundle_id="" dest="" stage="" backup=""
+installer_lock=""
 min_macos=15
 min_xcode=26
 
@@ -100,6 +101,31 @@ refuse_symlinks() {
         part="$part/$name"
         [[ ! -L "$part" ]] || fail "$part is a symlink. Remove it or move it aside, then run this script again."
     done
+}
+
+# Serialize updates and uninstall for one channel so neither can reset or remove
+# the other's source/build cache. A crashed installer leaves a lock for inspection.
+acquire_installer_lock() {
+    local channel="$1" candidate="$cache_root/$1.lock"
+    refuse_symlinks "$cache_root"
+    mkdir -p "$cache_root"
+    if ! mkdir "$candidate" 2>/dev/null; then
+        fail "Another $channel installer may be running. Lock: $candidate
+    If no installer is running, remove that lock directory and try again."
+    fi
+    installer_lock="$candidate"
+    trap 'finish; release_installer_lock' EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    printf '%s\n' "$$" > "$installer_lock/pid"
+}
+
+release_installer_lock() {
+    if [[ -n "$installer_lock" ]]; then
+        rm -f "$installer_lock/pid"
+        rmdir "$installer_lock"
+        installer_lock=""
+    fi
 }
 
 # Clones or updates the channel's branch into its own cache folder. The marker file proves this script
@@ -305,6 +331,7 @@ main() {
     fi
 
     if [[ "$action" == uninstall ]]; then
+        acquire_installer_lock "$channel"
         uninstall "$app_name" "$bundle_id" "$channel"
         exit 0
     fi
@@ -316,6 +343,7 @@ main() {
     # Know where the app goes before spending minutes on the build.
     choose_destination
     note "Will install to $dest"
+    acquire_installer_lock "$channel"
 
     local source_dir="$cache_root/$channel" log
     fetch_source "$branch" "$source_dir"
@@ -331,9 +359,6 @@ main() {
     # running app alone. `stage` and `backup` are global so `finish` still sees them on any exit.
     stage="$(mktemp -d "$(dirname "$dest")/.sotto-install.XXXXXX")" || fail "Could not write to $(dirname "$dest")."
     backup=""
-    trap finish EXIT
-    trap 'exit 130' INT
-    trap 'exit 143' TERM
     ditto "$built" "$stage/$app_name.app" || fail "Could not copy $app_name to $(dirname "$dest")."
     step "Installing to $dest"
     swap_in

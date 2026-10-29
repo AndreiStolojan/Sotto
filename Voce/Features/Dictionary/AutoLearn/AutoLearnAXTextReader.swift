@@ -232,7 +232,11 @@ final class AutoLearnAXTextReader {
         guard let previousValue = copyBool(Self.manualAccessibilityAttribute, from: appElement) else {
             return
         }
-        manualAccessibilityPreviousValue[processID] = previousValue
+        // Keep the value from before Sotto first enabled it, so a second capture
+        // before restore cannot record Sotto's own `true` as the original.
+        if manualAccessibilityPreviousValue[processID] == nil {
+            manualAccessibilityPreviousValue[processID] = previousValue
+        }
         let result = AXUIElementSetAttributeValue(
             appElement,
             Self.manualAccessibilityAttribute,
