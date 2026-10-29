@@ -5,7 +5,13 @@ import os.log
 import CoreML
 #endif
 
-class FluidAudioTranscriptionService: TranscriptionService {
+/// Runs Parakeet and Nemotron transcription and VAD for batch, prewarm and streaming callers.
+///
+/// It is an actor so its state is never touched from two threads, and every public operation also
+/// runs through `exclusively`. Actor isolation alone is not enough: each `await` inside an operation
+/// lets another call in, which could clean up or swap the managers mid-inference, or interleave
+/// Nemotron's setLanguage, reset, process and finish sequence with another request.
+actor FluidAudioTranscriptionService: TranscriptionService {
     private var asrManager: AsrManager?
     private var unifiedAsrManager: UnifiedAsrManager?
     private var nemotronAsrManager: StreamingNemotronMultilingualAsrManager?
@@ -13,9 +19,28 @@ class FluidAudioTranscriptionService: TranscriptionService {
     private var activeVersion: AsrModelVersion?
     private var activeNemotronModelName: String?
     private var cachedModels: AsrModels?
-    private var loadingTask: (version: AsrModelVersion, task: Task<AsrModels, Error>)?
+    private var isBusy = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
     private let audioConverter = AudioConverter()
     private let logger = Logger(subsystem: "ro.andrei.Voce", category: "FluidAudioTranscriptionService")
+
+    /// Runs `operation` after earlier operations finish, in call order. Ownership passes directly
+    /// to the next waiter, so a newly arriving call cannot slip in between.
+    private func exclusively<T>(_ operation: () async throws -> T) async rethrows -> T {
+        if isBusy {
+            await withCheckedContinuation { waiters.append($0) }
+        } else {
+            isBusy = true
+        }
+        defer {
+            if waiters.isEmpty {
+                isBusy = false
+            } else {
+                waiters.removeFirst().resume()
+            }
+        }
+        return try await operation()
+    }
 
     private func version(for model: any TranscriptionModel) -> AsrModelVersion {
         FluidAudioModelManager.asrVersion(for: model.name)
@@ -49,7 +74,7 @@ class FluidAudioTranscriptionService: TranscriptionService {
         // Clean up existing manager but preserve cachedModels for reuse
         await cleanupLoadedManagers()
 
-        let models = try await getOrLoadModels(for: version)
+        let models = try await loadModelsIfNeeded(for: version)
 
         let manager = AsrManager(config: .default)
         try await manager.loadModels(models)
@@ -82,61 +107,51 @@ class FluidAudioTranscriptionService: TranscriptionService {
         self.activeNemotronModelName = modelName
     }
 
-    // Returns cached models or loads from disk; deduplicates concurrent loads
+    /// Returns cached models or loads them from disk. The streaming provider builds its own manager
+    /// from these models.
     func getOrLoadModels(for version: AsrModelVersion) async throws -> AsrModels {
+        try await exclusively { try await loadModelsIfNeeded(for: version) }
+    }
+
+    private func loadModelsIfNeeded(for version: AsrModelVersion) async throws -> AsrModels {
         if let cached = cachedModels, cached.version == version {
             return cached
         }
 
-        // Deduplicate concurrent loads for the same version
-        if let (existingVersion, existingTask) = loadingTask, existingVersion == version {
-            return try await existingTask.value
-        }
-
-        let task = Task {
-            let cacheDirectory = AsrModels.defaultCacheDirectory(for: version)
-            let encoderPrecision = FluidAudioModelManager.parakeetEncoderPrecision(for: version)
-            guard AsrModels.modelsExist(at: cacheDirectory, version: version, encoderPrecision: encoderPrecision) else {
-                throw AsrModelsError.loadingFailed(
-                    "Parakeet model files are incomplete. Download the model from AI Models."
-                )
-            }
-            #if VOCE_LOCAL
-            // Dictation must never repair its model cache through a network download.
-            return try AsrModels.loadLocal(
-                from: cacheDirectory,
-                version: version,
-                encoderPrecision: encoderPrecision
+        let cacheDirectory = AsrModels.defaultCacheDirectory(for: version)
+        let encoderPrecision = FluidAudioModelManager.parakeetEncoderPrecision(for: version)
+        guard AsrModels.modelsExist(at: cacheDirectory, version: version, encoderPrecision: encoderPrecision) else {
+            throw AsrModelsError.loadingFailed(
+                "Parakeet model files are incomplete. Download the model from AI Models."
             )
-            #else
-            return try await AsrModels.load(
-                from: cacheDirectory,
-                configuration: nil,
-                version: version,
-                encoderPrecision: encoderPrecision
-            )
-            #endif
         }
-        loadingTask = (version, task)
-
-        do {
-            let models = try await task.value
-            self.cachedModels = models
-            // Only clear if we're still the current loading task
-            if loadingTask?.version == version {
-                self.loadingTask = nil
-            }
-            return models
-        } catch {
-            // Only clear if we're still the current loading task
-            if loadingTask?.version == version {
-                self.loadingTask = nil
-            }
-            throw error
-        }
+        #if VOCE_LOCAL
+        // Dictation must never repair its model cache through a network download.
+        let models = try AsrModels.loadLocal(
+            from: cacheDirectory,
+            version: version,
+            encoderPrecision: encoderPrecision
+        )
+        #else
+        let models = try await AsrModels.load(
+            from: cacheDirectory,
+            configuration: nil,
+            version: version,
+            encoderPrecision: encoderPrecision
+        )
+        #endif
+        cachedModels = models
+        return models
     }
 
     func loadModel(for model: FluidAudioModel) async throws {
+        try await exclusively {
+            try Task.checkCancellation()
+            try await loadModelUnlocked(for: model)
+        }
+    }
+
+    private func loadModelUnlocked(for model: FluidAudioModel) async throws {
         if FluidAudioModelManager.isNemotronModel(named: model.name) {
             // Realtime Nemotron uses a dedicated streaming manager; batch loads lazily in transcribe().
             return
@@ -153,6 +168,15 @@ class FluidAudioTranscriptionService: TranscriptionService {
     func transcribe(audioURL: URL, model: any TranscriptionModel, context: TranscriptionRequestContext) async throws
         -> String
     {
+        try await exclusively {
+            try Task.checkCancellation()
+            return try await transcribeUnlocked(audioURL: audioURL, model: model, context: context)
+        }
+    }
+
+    private func transcribeUnlocked(
+        audioURL: URL, model: any TranscriptionModel, context: TranscriptionRequestContext
+    ) async throws -> String {
         if FluidAudioModelManager.isParakeetUnifiedModel(named: model.name) {
             try await ensureUnifiedModelsLoaded()
             guard let unifiedAsrManager else {
@@ -230,10 +254,14 @@ class FluidAudioTranscriptionService: TranscriptionService {
 
     private func preparedSpeechAudio(from audioURL: URL) async throws -> [Float] {
         let samples = try loadAudioSamples(from: audioURL)
-        return try await preparedSpeechAudio(in: samples)
+        return try await preparedSpeechAudioUnlocked(in: samples)
     }
 
     func preparedSpeechAudio(in samples: [Float]) async throws -> [Float] {
+        try await exclusively { try await preparedSpeechAudioUnlocked(in: samples) }
+    }
+
+    private func preparedSpeechAudioUnlocked(in samples: [Float]) async throws -> [Float] {
         guard let segments = try await detectedSpeechAudio(in: samples) else {
             return samples
         }
@@ -249,6 +277,10 @@ class FluidAudioTranscriptionService: TranscriptionService {
 
     // Streaming callers retain each segment's original position for word timestamps.
     func detectedSpeechSegments(in samples: [Float]) async throws -> [VadSegment]? {
+        try await exclusively { try await detectedSpeechSegmentsUnlocked(in: samples) }
+    }
+
+    private func detectedSpeechSegmentsUnlocked(in samples: [Float]) async throws -> [VadSegment]? {
         guard UserDefaults.standard.bool(forKey: "IsVADEnabled") else {
             return nil
         }
@@ -307,9 +339,10 @@ class FluidAudioTranscriptionService: TranscriptionService {
         }
     }
 
-    // Releases ASR/VAD resources but preserves cached models for reuse
+    /// Releases ASR/VAD resources but preserves cached models for reuse. Waits for a running
+    /// transcription instead of releasing its managers underneath it.
     func cleanup() async {
-        await cleanupLoadedManagers()
+        await exclusively { await cleanupLoadedManagers() }
     }
 
 }

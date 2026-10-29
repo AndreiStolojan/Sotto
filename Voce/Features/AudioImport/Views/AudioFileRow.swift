@@ -18,12 +18,13 @@ struct AudioFileRow: View {
         }
     }
 
-    /// Text for copy/save — matches visible content regardless of expansion state.
+    /// Text for copy/save: the visible tab when expanded, otherwise the enhanced text unless it
+    /// only records an enhancement failure, like History.
     private var actionText: String {
         if isExpanded {
             return displayText
         }
-        return item.transcription?.enhancedText ?? item.transcription?.text ?? ""
+        return item.transcription?.preferredHistoryText ?? ""
     }
 
     var body: some View {

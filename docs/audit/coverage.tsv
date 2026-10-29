@@ -1,0 +1,424 @@
+Path	Inspection
+.github/workflows/ci.yml	Documentation, script, configuration or integration review
+.gitignore	Documentation, script, configuration or integration review
+CONTRIBUTING.md	Documentation, script, configuration or integration review
+LICENSE	Documentation, script, configuration or integration review
+NOTICE.md	Documentation, script, configuration or integration review
+README.md	Documentation, script, configuration or integration review
+SECURITY.md	Documentation, script, configuration or integration review
+Tests/AuditPersistence/SettingsValueLimitsTests.swift	Test source integration review
+Tests/AuditPortable/RulesTests.swift	Test source integration review
+Tests/AuditProviders/CoreMLArchiveTests.swift	Test source integration review
+Tests/AuditProviders/ProviderAuditTests.swift	Test source integration review
+Tests/AuditRecording/CSVFieldTests.swift	Test source integration review
+Tests/Benchmark/test_benchmark.py	Documentation, script, configuration or integration review
+Tests/CI/CoreTests.swift	Test source integration review
+Tests/Installer/test_installer.py	Documentation, script, configuration or integration review
+Tests/VoceUITests/VoceUITests.swift	Test source integration review
+Tests/VoceUITests/VoceUITestsLaunchTests.swift	Test source integration review
+Voce.xcodeproj/project.pbxproj	Documentation, script, configuration or integration review
+Voce.xcodeproj/project.xcworkspace/contents.xcworkspacedata	Documentation, script, configuration or integration review
+Voce.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings	Documentation, script, configuration or integration review
+Voce.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved	Documentation, script, configuration or integration review
+Voce.xcodeproj/xcshareddata/xcschemes/Voce.xcscheme	Documentation, script, configuration or integration review
+Voce/App/AppIntents/AppShortcuts.swift	Persistence report plus parent full source review
+Voce/App/AppIntents/DismissMiniRecorderIntent.swift	Persistence report plus parent full source review
+Voce/App/AppIntents/ToggleMiniRecorderIntent.swift	Persistence report plus parent full source review
+Voce/App/Components/AppIconView.swift	Persistence report plus parent full source review
+Voce/App/Configuration/AppAppearancePreference.swift	Persistence report plus parent full source review
+Voce/App/Configuration/AppDefaults.swift	Persistence source review
+Voce/App/Configuration/AppLanguagePreference.swift	Persistence report plus parent full source review
+Voce/App/Configuration/AppStorageNamespace.swift	Persistence source review
+Voce/App/Configuration/SettingsValueLimits.swift	Persistence source review
+Voce/App/Lifecycle/AppDelegate.swift	Persistence source review
+Voce/App/Lifecycle/ModelPrewarmService.swift	Persistence source review
+Voce/App/MenuBar/MenuBarManager.swift	Persistence report plus parent full source review
+Voce/App/MenuBar/MenuBarView.swift	Persistence report plus parent full source review
+Voce/App/Migrations/OnboardingV2Migration.swift	Persistence source review
+Voce/App/Migrations/RebrandMigration.swift	Persistence source review
+Voce/App/Migrations/StreamingKeysMigration.swift	Persistence source review
+Voce/App/Navigation/AppSidebar.swift	Persistence report plus parent full source review
+Voce/App/Navigation/ContentView.swift	Persistence report plus parent full source review
+Voce/App/Notifications/AnnouncementManager.swift	Persistence source review
+Voce/App/Notifications/AppNotifications.swift	Persistence report plus parent full source review
+Voce/App/Notifications/NotificationManager.swift	Persistence source review
+Voce/App/Notifications/Views/AnnouncementView.swift	Persistence report plus parent full source review
+Voce/App/Notifications/Views/AppNotificationView.swift	Persistence report plus parent full source review
+Voce/App/Voce.swift	Persistence source review
+Voce/App/Windows/PersistentQuickPanel.swift	Persistence report plus parent full source review
+Voce/App/Windows/WindowManager.swift	Persistence report plus parent full source review
+Voce/Assets.xcassets/AccentColor.colorset/Contents.json	Documentation, script, configuration or integration review
+Voce/Assets.xcassets/AppIcon.appiconset/1024-mac.png	Resource reference/header inspection; no device playback/render
+Voce/Assets.xcassets/AppIcon.appiconset/128-mac.png	Resource reference/header inspection; no device playback/render
+Voce/Assets.xcassets/AppIcon.appiconset/16-mac.png	Resource reference/header inspection; no device playback/render
+Voce/Assets.xcassets/AppIcon.appiconset/256-mac.png	Resource reference/header inspection; no device playback/render
+Voce/Assets.xcassets/AppIcon.appiconset/32-mac.png	Resource reference/header inspection; no device playback/render
+Voce/Assets.xcassets/AppIcon.appiconset/512-mac.png	Resource reference/header inspection; no device playback/render
+Voce/Assets.xcassets/AppIcon.appiconset/64-mac.png	Resource reference/header inspection; no device playback/render
+Voce/Assets.xcassets/AppIcon.appiconset/Contents.json	Documentation, script, configuration or integration review
+Voce/Assets.xcassets/AppIconBeta.appiconset/1024-mac.png	Resource reference/header inspection; no device playback/render
+Voce/Assets.xcassets/AppIconBeta.appiconset/128-mac.png	Resource reference/header inspection; no device playback/render
+Voce/Assets.xcassets/AppIconBeta.appiconset/16-mac.png	Resource reference/header inspection; no device playback/render
+Voce/Assets.xcassets/AppIconBeta.appiconset/256-mac.png	Resource reference/header inspection; no device playback/render
+Voce/Assets.xcassets/AppIconBeta.appiconset/32-mac.png	Resource reference/header inspection; no device playback/render
+Voce/Assets.xcassets/AppIconBeta.appiconset/512-mac.png	Resource reference/header inspection; no device playback/render
+Voce/Assets.xcassets/AppIconBeta.appiconset/64-mac.png	Resource reference/header inspection; no device playback/render
+Voce/Assets.xcassets/AppIconBeta.appiconset/Contents.json	Documentation, script, configuration or integration review
+Voce/Assets.xcassets/Contents.json	Documentation, script, configuration or integration review
+Voce/Assets.xcassets/menuBarIcon.imageset/Contents.json	Documentation, script, configuration or integration review
+Voce/Assets.xcassets/menuBarIcon.imageset/menuBarIcon.png	Resource reference/header inspection; no device playback/render
+Voce/Assets.xcassets/nvidia-logo.imageset/Contents.json	Documentation, script, configuration or integration review
+Voce/Assets.xcassets/nvidia-logo.imageset/nvidia-logo.svg	XML inspection; no design change
+Voce/Core/Enhancement/AIEnhancementOutputFilter.swift	Recording source review
+Voce/Core/Enhancement/AIPrompts.swift	Recording source review
+Voce/Core/Enhancement/EnhancementFailureFormatter.swift	Recording source review
+Voce/Core/Recording/RecordingState.swift	Recording source review
+Voce/Core/Transcription/VoceEngineError.swift	Recording source review
+Voce/DesignSystem/Components/AddIconButton.swift	Persistence report plus parent full source review
+Voce/DesignSystem/Components/AppControls.swift	Persistence report plus parent full source review
+Voce/DesignSystem/Components/CompactHeroSection.swift	Persistence report plus parent full source review
+Voce/DesignSystem/Components/CopyIconButton.swift	Persistence report plus parent full source review
+Voce/DesignSystem/Components/ExpandableSettingsRow.swift	Persistence report plus parent full source review
+Voce/DesignSystem/Components/InfoTip.swift	Persistence report plus parent full source review
+Voce/DesignSystem/Components/MarkdownContentView.swift	Persistence report plus parent full source review
+Voce/DesignSystem/Components/QuickPanelControls.swift	Persistence report plus parent full source review
+Voce/DesignSystem/Layouts/FlowLayout.swift	Persistence report plus parent full source review
+Voce/DesignSystem/Native/VisualEffectView.swift	Persistence report plus parent full source review
+Voce/DesignSystem/Overlays/SidePanel.swift	Persistence report plus parent full source review
+Voce/DesignSystem/Surfaces/AppSurfaces.swift	Persistence report plus parent full source review
+Voce/DesignSystem/Theme/AppTheme.swift	Persistence report plus parent full source review
+Voce/Features/Assistant/State/AssistantSession.swift	Recording source review
+Voce/Features/Assistant/Workflows/AssistantChatService.swift	Recording source review
+Voce/Features/AudioImport/State/AudioFileQueueItem.swift	Recording source review
+Voce/Features/AudioImport/State/TranscriptionResultView.swift	Recording source review
+Voce/Features/AudioImport/Views/AudioFileRow.swift	Recording source review
+Voce/Features/AudioImport/Views/AudioTranscribeView.swift	Recording source review
+Voce/Features/AudioImport/Workflows/AudioFileTranscriptionManager.swift	Recording source review
+Voce/Features/AudioSettings/Views/AudioSetupView.swift	Recording source review
+Voce/Features/AudioSettings/Views/CustomSoundSettingsView.swift	Recording source review
+Voce/Features/Dashboard/Components/DashboardActivityCalendarCard.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Components/DashboardHeroCard.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Components/DashboardIconGlyph.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Components/DashboardInsightCardBackground.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Components/DashboardPeakHoursCard.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Components/DashboardTimeSavedCard.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Components/DashboardTranscriptCards.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Components/ModelInsightComponents.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Components/ModelInsightPanelComponents.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Components/ModelPerformanceCard.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Components/ModelProviderIcon.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Components/ModelUsageCard.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/State/DashboardStatsModels.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Support/DashboardFormatters.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Views/DashboardContent.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Views/DashboardInsightsView.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Views/DashboardLayout.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Views/DashboardView.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Views/ModelPerformancePanel.swift	Persistence report plus parent full source review
+Voce/Features/Dashboard/Views/ModelUsagePanel.swift	Persistence report plus parent full source review
+Voce/Features/Dictionary/AutoLearn/AutoLearnAIReviewer.swift	Persistence source review
+Voce/Features/Dictionary/AutoLearn/AutoLearnAXRuntime.swift	Persistence source review
+Voce/Features/Dictionary/AutoLearn/AutoLearnAXTextReader.swift	Persistence source review
+Voce/Features/Dictionary/AutoLearn/AutoLearnFocusObserver.swift	Persistence source review
+Voce/Features/Dictionary/AutoLearn/AutoLearnJSONArrayFile.swift	Persistence source review
+Voce/Features/Dictionary/AutoLearn/AutoLearnPendingQueue.swift	Persistence source review
+Voce/Features/Dictionary/AutoLearn/AutoLearnReviewProposalStore.swift	Persistence source review
+Voce/Features/Dictionary/AutoLearn/AutoLearnService.swift	Persistence source review
+Voce/Features/Dictionary/AutoLearn/AutoLearnTypes.swift	Persistence source review
+Voce/Features/Dictionary/AutoLearn/CorrectionDiffEngine.swift	Persistence source review
+Voce/Features/Dictionary/AutoLearn/FinalSnapshotDiffEngine.swift	Persistence source review
+Voce/Features/Dictionary/AutoLearn/WordReplacementStore.swift	Persistence source review
+Voce/Features/Dictionary/QuickAdd/DictionaryQuickAddPanel.swift	Persistence source review
+Voce/Features/Dictionary/Views/AutoLearnFailurePanel.swift	Persistence source review
+Voce/Features/Dictionary/Views/AutoLearnModelSelectionView.swift	Persistence source review
+Voce/Features/Dictionary/Views/AutoLearnReviewPanel.swift	Persistence source review
+Voce/Features/Dictionary/Views/DictionaryFilePanelService.swift	Persistence source review
+Voce/Features/Dictionary/Views/DictionaryImportPreviewSheet.swift	Persistence source review
+Voce/Features/Dictionary/Views/DictionaryPill.swift	Persistence source review
+Voce/Features/Dictionary/Views/DictionarySettingsPanel.swift	Persistence source review
+Voce/Features/Dictionary/Views/DictionarySettingsView.swift	Persistence source review
+Voce/Features/Dictionary/Views/EditReplacementSheet.swift	Persistence source review
+Voce/Features/Dictionary/Views/VocabularyView.swift	Persistence source review
+Voce/Features/Dictionary/Views/WordReplacementView.swift	Persistence source review
+Voce/Features/Dictionary/Workflows/CustomVocabularyService.swift	Persistence source review
+Voce/Features/Dictionary/Workflows/DictionaryArchive.swift	Persistence source review
+Voce/Features/Dictionary/Workflows/DictionaryImportExportService.swift	Persistence source review
+Voce/Features/Dictionary/Workflows/DictionaryService.swift	Persistence source review
+Voce/Features/Dictionary/Workflows/DictionarySortService.swift	Persistence source review
+Voce/Features/Dictionary/Workflows/WordReplacementService.swift	Persistence source review
+Voce/Features/Dictionary/Workflows/WordReplacementVariants.swift	Persistence source review
+Voce/Features/Enhancement/Models/CustomPrompt.swift	Recording source review
+Voce/Features/Enhancement/State/AIService.swift	Recording source review
+Voce/Features/Enhancement/State/FillerWordManager.swift	Recording source review
+Voce/Features/Enhancement/Templates/PromptTemplates.swift	Recording source review
+Voce/Features/Enhancement/Views/EnhancementShortcutsView.swift	Recording source review
+Voce/Features/Enhancement/Views/FillerWordsSettingsView.swift	Recording source review
+Voce/Features/Enhancement/Views/PromptEditorView.swift	Recording source review
+Voce/Features/Enhancement/Views/PromptSelectionGrid.swift	Recording source review
+Voce/Features/Enhancement/Workflows/AIEnhancementService.swift	Recording source review
+Voce/Features/History/Components/AudioPlayerView.swift	Recording source review
+Voce/Features/History/Components/HistoryAudioPlayer.swift	Recording source review
+Voce/Features/History/Components/HistoryComponents.swift	Recording source review
+Voce/Features/History/Components/HistoryDetailActionBar.swift	Recording source review
+Voce/Features/History/Components/SaveIconButton.swift	Recording source review
+Voce/Features/History/Components/TranscriptionListItem.swift	Recording source review
+Voce/Features/History/Export/CSVField.swift	Recording source review
+Voce/Features/History/Export/VoceCSVExportService.swift	Recording source review
+Voce/Features/History/Models/Transcription+History.swift	Recording source review
+Voce/Features/History/Presentation/QuickHistoryController.swift	Recording source review
+Voce/Features/History/Views/HistoryAnalysisPanelView.swift	Recording source review
+Voce/Features/History/Views/HistorySettingsPanel.swift	Recording source review
+Voce/Features/History/Views/HistoryView.swift	Recording source review
+Voce/Features/History/Views/QuickHistoryView.swift	Recording source review
+Voce/Features/History/Views/QuickHistoryViewModel.swift	Recording source review
+Voce/Features/History/Views/TranscriptionDetailView.swift	Recording source review
+Voce/Features/History/Views/TranscriptionInfoPanel.swift	Recording source review
+Voce/Features/History/Workflows/AudioFileTranscriptionService.swift	Recording source review
+Voce/Features/History/Workflows/LastTranscriptionService.swift	Recording source review
+Voce/Features/ModelLibrary/Components/FluidAudioModelCardView.swift	Provider source review
+Voce/Features/ModelLibrary/Components/LanguageSelectionView.swift	Provider source review
+Voce/Features/ModelLibrary/Components/ModelCardView.swift	Provider source review
+Voce/Features/ModelLibrary/Components/NativeAppleLanguageAssetControl.swift	Provider source review
+Voce/Features/ModelLibrary/Components/NativeModelCardView.swift	Provider source review
+Voce/Features/ModelLibrary/Components/ProviderSharedViews.swift	Provider source review
+Voce/Features/ModelLibrary/Components/TranscribeCppModelCardView.swift	Provider source review
+Voce/Features/ModelLibrary/Components/WhisperModelCardView.swift	Provider source review
+Voce/Features/ModelLibrary/Models/LanguageDictionary.swift	Provider source review
+Voce/Features/ModelLibrary/Models/TranscriptionModel.swift	Provider source review
+Voce/Features/ModelLibrary/Models/TranscriptionModelRegistry.swift	Provider source review
+Voce/Features/ModelLibrary/Models/TranscriptionRealtimeSupport.swift	Provider source review
+Voce/Features/ModelLibrary/State/FluidAudioModelManager.swift	Provider source review
+Voce/Features/ModelLibrary/State/TranscribeCppModelManager.swift	Provider source review
+Voce/Features/ModelLibrary/State/TranscriptionModelManager.swift	Provider source review
+Voce/Features/ModelLibrary/State/WhisperCoreMLArchive.swift	Provider source review
+Voce/Features/ModelLibrary/State/WhisperModelCatalog.swift	Provider source review
+Voce/Features/ModelLibrary/State/WhisperModelManager.swift	Provider source review
+Voce/Features/ModelLibrary/State/WhisperModelWarmupCoordinator.swift	Provider source review
+Voce/Features/ModelLibrary/Views/ModelManagementView.swift	Provider source review
+Voce/Features/ModelLibrary/Views/ModelSettingsPanel.swift	Provider source review
+Voce/Features/ModelLibrary/Views/ProviderLocalManagementView.swift	Provider source review
+Voce/Features/Modes/Components/ModeViewComponents.swift	Persistence report plus parent full source review
+Voce/Features/Modes/Components/TriggerSelectionItems.swift	Persistence source review
+Voce/Features/Modes/Components/TriggerTemplateRow.swift	Persistence source review
+Voce/Features/Modes/Coordination/ModeSetupNavigator.swift	Persistence source review
+Voce/Features/Modes/Models/CustomCommandTemplate.swift	Persistence source review
+Voce/Features/Modes/Models/ModeIcon.swift	Persistence source review
+Voce/Features/Modes/Models/ModeTriggerHelpers.swift	Persistence source review
+Voce/Features/Modes/Models/ModeTriggerModels.swift	Persistence source review
+Voce/Features/Modes/Models/ModeTriggerWordDetectionService.swift	Persistence source review
+Voce/Features/Modes/State/EmojiManager.swift	Persistence source review
+Voce/Features/Modes/State/ModeConfig.swift	Persistence source review
+Voce/Features/Modes/State/ModeConfigDraft.swift	Persistence source review
+Voce/Features/Modes/State/ModeFormWarmupStore.swift	Persistence source review
+Voce/Features/Modes/State/ModeRuntimeConfiguration.swift	Persistence source review
+Voce/Features/Modes/State/ModeValidator.swift	Persistence source review
+Voce/Features/Modes/State/ModeWebsiteMatcher.swift	Persistence source review
+Voce/Features/Modes/Templates/StarterModeFactory.swift	Persistence source review
+Voce/Features/Modes/Templates/StarterModePromptSeeder.swift	Persistence source review
+Voce/Features/Modes/Templates/StarterModeTemplate.swift	Persistence source review
+Voce/Features/Modes/Templates/TriggerTemplateCatalog.swift	Persistence source review
+Voce/Features/Modes/Views/ModeConfigEditorView.swift	Persistence source review
+Voce/Features/Modes/Views/ModeConfigFormView.swift	Persistence report plus parent full source review
+Voce/Features/Modes/Views/ModeIconPickerView.swift	Persistence report plus parent full source review
+Voce/Features/Modes/Views/ModePopover.swift	Persistence source review
+Voce/Features/Modes/Views/ModeSettingsPanelView.swift	Persistence report plus parent full source review
+Voce/Features/Modes/Views/ModeSettingsQuickSwitchTip.swift	Persistence source review
+Voce/Features/Modes/Views/ModeTriggerSection.swift	Persistence source review
+Voce/Features/Modes/Views/ModeTriggerSelectionView.swift	Persistence source review
+Voce/Features/Modes/Views/ModeView.swift	Persistence source review
+Voce/Features/Modes/Views/TriggerGroupEditorView.swift	Persistence source review
+Voce/Features/Modes/Views/TriggerPickerPopover.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/Components/OnboardingExperienceCard.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/Components/OnboardingExperienceIntroCard.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/Components/OnboardingLockedTextEditor.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/Components/OnboardingSections.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/Components/OnboardingShortcutSetupView.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/Components/OnboardingTranscriptionSetupCard.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/Components/PermissionStepRow.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/Components/TranscriptionModelDownloadCard.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/Models/OnboardingExperienceModels.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/State/OnboardingCoordinator.swift	Persistence source review
+Voce/Features/Onboarding/State/OnboardingFlowController.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/State/OnboardingPermissionController.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/State/OnboardingPermissionModels.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/Views/OnboardingContextAwarenessScreen.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/Views/OnboardingExperienceScreen.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/Views/OnboardingMicrophoneScreen.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/Views/OnboardingModelScreen.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/Views/OnboardingPermissionsScreen.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/Views/OnboardingTrustScreen.swift	Persistence report plus parent full source review
+Voce/Features/Onboarding/Views/OnboardingView.swift	Persistence report plus parent full source review
+Voce/Features/Recording/Capture/Recorder+RecordingDeviceSetup.swift	Recording source review
+Voce/Features/Recording/Capture/Recorder.swift	Recording source review
+Voce/Features/Recording/Components/AudioVisualizerView.swift	Recording source review
+Voce/Features/Recording/Components/CircularRecorderButtonStyle.swift	Recording source review
+Voce/Features/Recording/Components/NotchShape.swift	Recording source review
+Voce/Features/Recording/Components/RecorderComponents.swift	Recording source review
+Voce/Features/Recording/Context/RecordingContextSnapshot.swift	Recording source review
+Voce/Features/Recording/Presentation/DockVisibilityController.swift	Recording source review
+Voce/Features/Recording/Presentation/MiniRecorderPanel.swift	Recording source review
+Voce/Features/Recording/Presentation/MiniWindowManager.swift	Recording source review
+Voce/Features/Recording/Presentation/NotchLink.swift	Recording source review
+Voce/Features/Recording/Presentation/NotchRecorderPanel.swift	Recording source review
+Voce/Features/Recording/Presentation/NotchSocket.swift	Recording source review
+Voce/Features/Recording/Presentation/NotchWindowManager.swift	Recording source review
+Voce/Features/Recording/Presentation/RecorderScreenResolver.swift	Recording source review
+Voce/Features/Recording/Presentation/RecorderUIManager.swift	Recording source review
+Voce/Features/Recording/Processing/TranscriptionOutputFilter.swift	Recording source review
+Voce/Features/Recording/State/RecorderStateProvider.swift	Recording source review
+Voce/Features/Recording/Streaming/StreamingTranscriptionService.swift	Recording source review
+Voce/Features/Recording/Views/EnhancementPromptPopover.swift	Recording source review
+Voce/Features/Recording/Views/MiniRecorderView.swift	Recording source review
+Voce/Features/Recording/Views/NotchRecorderView.swift	Recording source review
+Voce/Features/Recording/Workflows/DictationLatencyTrace.swift	Recording source review
+Voce/Features/Recording/Workflows/TranscriptionDelivery.swift	Recording source review
+Voce/Features/Recording/Workflows/TranscriptionPipeline.swift	Recording source review
+Voce/Features/Recording/Workflows/TranscriptionService.swift	Recording source review
+Voce/Features/Recording/Workflows/TranscriptionServiceRegistry.swift	Recording source review
+Voce/Features/Recording/Workflows/TranscriptionSession.swift	Recording source review
+Voce/Features/Recording/Workflows/VoceEngine+Assistant.swift	Recording source review
+Voce/Features/Recording/Workflows/VoceEngine+AudioInputFailure.swift	Recording source review
+Voce/Features/Recording/Workflows/VoceEngine+Protocols.swift	Recording source review
+Voce/Features/Recording/Workflows/VoceEngine.swift	Recording source review
+Voce/Features/Settings/Backup/BackupImporter.swift	Persistence source review
+Voce/Features/Settings/Backup/BackupTypes.swift	Persistence source review
+Voce/Features/Settings/Backup/ImportExportService.swift	Persistence source review
+Voce/Features/Settings/Diagnostics/SystemInfoService.swift	Persistence report plus parent full source review
+Voce/Features/Settings/FinishAndSendSettings.swift	Persistence source review
+Voce/Features/Settings/Updates/UpdateCheck.swift	Persistence source review
+Voce/Features/Settings/Views/DiagnosticsSettingsView.swift	Persistence source review
+Voce/Features/Settings/Views/SettingsView.swift	Persistence source review
+Voce/Features/Settings/Views/UpdateSettingsView.swift	Persistence source review
+Voce/Features/Shortcuts/Coordination/ModeShortcutManager.swift	Persistence source review
+Voce/Features/Shortcuts/Coordination/RecorderPanelShortcutManager.swift	Persistence source review
+Voce/Features/Shortcuts/Coordination/RecordingShortcutManager.swift	Persistence source review
+Voce/Features/Shortcuts/Coordination/ShortcutMonitor.swift	Persistence source review
+Voce/Features/Shortcuts/Models/Shortcut.swift	Persistence source review
+Voce/Features/Shortcuts/Models/ShortcutAction.swift	Persistence report plus parent full source review
+Voce/Features/Shortcuts/State/ShortcutMigration.swift	Persistence report plus parent full source review
+Voce/Features/Shortcuts/State/ShortcutStore.swift	Persistence source review
+Voce/Features/Shortcuts/State/ShortcutValidator.swift	Persistence source review
+Voce/Features/Shortcuts/Views/ShortcutPreviewView.swift	Persistence report plus parent full source review
+Voce/Features/Shortcuts/Views/ShortcutRecorder.swift	Persistence report plus parent full source review
+Voce/Info.plist	Documentation, script, configuration or integration review
+Voce/InfoPlist.xcstrings	Structure and placeholders; wording not proofread
+Voce/Infrastructure/Audio/AudioFileProcessor.swift	Recording source review
+Voce/Infrastructure/Audio/CoreAudioRecorder.swift	Recording source review
+Voce/Infrastructure/Audio/CustomSoundManager.swift	Recording source review
+Voce/Infrastructure/Audio/Devices/AudioDeviceConfiguration.swift	Recording source review
+Voce/Infrastructure/Audio/Devices/AudioDeviceManager+RecordingRouting.swift	Recording source review
+Voce/Infrastructure/Audio/Devices/AudioDeviceManager.swift	Recording source review
+Voce/Infrastructure/Audio/PCMAudioConverter.swift	Recording source review
+Voce/Infrastructure/Audio/SoundManager.swift	Recording source review
+Voce/Infrastructure/Audio/SoundPlaybackEngine.swift	Recording source review
+Voce/Infrastructure/Audio/SupportedMedia.swift	Recording source review
+Voce/Infrastructure/Diagnostics/LogExporter.swift	Persistence source review
+Voce/Infrastructure/Persistence/Cleanup/AudioCleanupManager.swift	Persistence source review
+Voce/Infrastructure/Persistence/Cleanup/RecordingFileLocation.swift	Persistence source review
+Voce/Infrastructure/Persistence/Cleanup/TranscriptionAutoCleanupService.swift	Persistence source review
+Voce/Infrastructure/Persistence/Migrations/ModeDataMigration.swift	Persistence source review
+Voce/Infrastructure/Persistence/Migrations/SessionMetricMigrationService.swift	Persistence source review
+Voce/Infrastructure/Persistence/Models/SessionMetric.swift	Persistence source review
+Voce/Infrastructure/Persistence/Models/Transcription.swift	Persistence source review
+Voce/Infrastructure/Persistence/Models/VocabularyWord.swift	Persistence source review
+Voce/Infrastructure/Persistence/Models/WordReplacement.swift	Persistence source review
+Voce/Infrastructure/Persistence/Preferences/UserDefaultsManager.swift	Persistence source review
+Voce/Infrastructure/Persistence/Statistics/DashboardStatsLoader.swift	Persistence source review
+Voce/Infrastructure/Persistence/Statistics/DashboardStatsSnapshotStore.swift	Persistence source review
+Voce/Infrastructure/Persistence/Statistics/EstimatedTokenCounter.swift	Persistence source review
+Voce/Infrastructure/Persistence/Statistics/SessionMetricRecorder.swift	Persistence source review
+Voce/Infrastructure/Providers/Enhancement/AIChatCompletionService.swift	Provider source review
+Voce/Infrastructure/Providers/Enhancement/EnhancementRequestSettings.swift	Provider source review
+Voce/Infrastructure/Providers/Enhancement/LocalCLI/LocalCLIService.swift	Provider source review
+Voce/Infrastructure/Providers/Enhancement/Ollama/OllamaService.swift	Provider source review
+Voce/Infrastructure/Providers/Transcription/AppleSpeech/NativeAppleSpeechAssetManager.swift	Provider source review
+Voce/Infrastructure/Providers/Transcription/AppleSpeech/NativeAppleTranscriptionService.swift	Provider source review
+Voce/Infrastructure/Providers/Transcription/Contracts/StreamingTranscriptionProvider.swift	Provider source review
+Voce/Infrastructure/Providers/Transcription/FluidAudio/FluidAudioTranscriptionService.swift	Provider source review
+Voce/Infrastructure/Providers/Transcription/FluidAudio/Streaming/FluidAudioNemotronStreamingProvider.swift	Provider source review
+Voce/Infrastructure/Providers/Transcription/FluidAudio/Streaming/FluidAudioStreamingProvider.swift	Provider source review
+Voce/Infrastructure/Providers/Transcription/FluidAudio/Streaming/FluidAudioUnifiedStreamingProvider.swift	Provider source review
+Voce/Infrastructure/Providers/Transcription/FluidAudio/Streaming/WordAgreementEngine.swift	Provider source review
+Voce/Infrastructure/Providers/Transcription/TranscribeCpp/OfflineTranscribeCppService.swift	Provider source review
+Voce/Infrastructure/Providers/Transcription/TranscribeCpp/TranscribeCppModelCatalog.swift	Provider source review
+Voce/Infrastructure/Providers/Transcription/TranscribeCpp/TranscribeCppTranscriptionService.swift	Provider source review
+Voce/Infrastructure/Providers/Transcription/Whisper/LibWhisper.swift	Provider source review
+Voce/Infrastructure/Providers/Transcription/Whisper/VADModelManager.swift	Provider source review
+Voce/Infrastructure/Providers/Transcription/Whisper/WhisperModelProvider.swift	Provider source review
+Voce/Infrastructure/Providers/Transcription/Whisper/WhisperPrompt.swift	Provider source review
+Voce/Infrastructure/Providers/Transcription/Whisper/WhisperTranscriptionService.swift	Provider source review
+Voce/Infrastructure/SystemIntegration/Accessibility/SelectedTextService.swift	Persistence source review
+Voce/Infrastructure/SystemIntegration/Context/ActiveWindowService.swift	Provider source review
+Voce/Infrastructure/SystemIntegration/Context/BrowserURLService.swift	Provider source review
+Voce/Infrastructure/SystemIntegration/Context/TriggerAppIconCache.swift	Provider source review
+Voce/Infrastructure/SystemIntegration/Context/TriggerInstalledApps.swift	Provider source review
+Voce/Infrastructure/SystemIntegration/Hardware/ClamshellStateMonitor.swift	Persistence source review
+Voce/Infrastructure/SystemIntegration/Hardware/SystemArchitecture.swift	Persistence source review
+Voce/Infrastructure/SystemIntegration/LaunchAtLoginManager.swift	Persistence source review
+Voce/Infrastructure/SystemIntegration/Lifecycle/LifecycleObserver.swift	Persistence source review
+Voce/Infrastructure/SystemIntegration/Lifecycle/UserSessionInputPolicy.swift	Persistence source review
+Voce/Infrastructure/SystemIntegration/Media/MediaController.swift	Persistence source review
+Voce/Infrastructure/SystemIntegration/Media/PlaybackController.swift	Persistence source review
+Voce/Infrastructure/SystemIntegration/Paste/ClipboardManager.swift	Persistence source review
+Voce/Infrastructure/SystemIntegration/Paste/CursorPaster.swift	Persistence source review
+Voce/Infrastructure/SystemIntegration/Paste/PasteMethod.swift	Persistence source review
+Voce/Infrastructure/SystemIntegration/Processes/CustomCommandDeliveryRunner.swift	Provider source review
+Voce/Infrastructure/SystemIntegration/Processes/ProcessRunner.swift	Provider source review
+Voce/Infrastructure/SystemIntegration/Processes/ShellCommandEnvironment.swift	Provider source review
+Voce/Infrastructure/SystemIntegration/ScreenCapture/ScreenCaptureService.swift	Persistence source review
+Voce/Infrastructure/TextProcessing/ParagraphFormatter.swift	Recording source review
+Voce/Infrastructure/TextProcessing/WordCounter.swift	Recording source review
+Voce/Localizable.xcstrings	Structure and placeholders; wording not proofread
+Voce/Preview Content/Preview Assets.xcassets/Contents.json	Documentation, script, configuration or integration review
+Voce/Resources/Sounds/Feather-tap-license.txt	Documentation, script, configuration or integration review
+Voce/Resources/Sounds/feather-start.wav	Resource reference/header inspection; no device playback/render
+Voce/Resources/Sounds/feather-stop.wav	Resource reference/header inspection; no device playback/render
+Voce/Resources/Sounds/sound1.wav	Resource reference/header inspection; no device playback/render
+Voce/Resources/Sounds/sound2.wav	Resource reference/header inspection; no device playback/render
+Voce/Resources/Sounds/sound3.wav	Resource reference/header inspection; no device playback/render
+Voce/Resources/Sounds/sound4.wav	Resource reference/header inspection; no device playback/render
+Voce/Resources/Sounds/sound5.mp3	Resource reference/header inspection; no device playback/render
+Voce/Resources/Sounds/sound6.mp3	Resource reference/header inspection; no device playback/render
+Voce/Resources/Sounds/sound7.wav	Resource reference/header inspection; no device playback/render
+Voce/Resources/THIRD_PARTY_LICENSES.md	Documentation, script, configuration or integration review
+Voce/Resources/arcURL.scpt	Documentation, script, configuration or integration review
+Voce/Resources/braveURL.scpt	Documentation, script, configuration or integration review
+Voce/Resources/chromeURL.scpt	Documentation, script, configuration or integration review
+Voce/Resources/cometURL.scpt	Documentation, script, configuration or integration review
+Voce/Resources/diaURL.scpt	Documentation, script, configuration or integration review
+Voce/Resources/edgeURL.scpt	Documentation, script, configuration or integration review
+Voce/Resources/models/ggml-silero-v5.1.2.bin	Binary inventory and declared provenance; inference not executed
+Voce/Resources/operaURL.scpt	Documentation, script, configuration or integration review
+Voce/Resources/orionURL.scpt	Documentation, script, configuration or integration review
+Voce/Resources/safariURL.scpt	Documentation, script, configuration or integration review
+Voce/Resources/vivaldiURL.scpt	Documentation, script, configuration or integration review
+Voce/Resources/yandexURL.scpt	Documentation, script, configuration or integration review
+Voce/Voce.local.entitlements	Documentation, script, configuration or integration review
+design/Voce-icon.svg	XML inspection; no design change
+design/Voce-menu-bar.svg	XML inspection; no design change
+docs/audit/2026-10-29.md	Documentation, script, configuration or integration review
+docs/audit/details/parent-integration.md	Documentation, script, configuration or integration review
+docs/audit/details/persistence.md	Documentation, script, configuration or integration review
+docs/audit/details/providers-followup.md	Documentation, script, configuration or integration review
+docs/audit/details/providers.md	Documentation, script, configuration or integration review
+docs/audit/details/recording.md	Documentation, script, configuration or integration review
+docs/benchmarks/README.md	Documentation, script, configuration or integration review
+docs/benchmarks/prompts.json	Documentation, script, configuration or integration review
+docs/images/dictionary.png	Resource reference/header inspection; no device playback/render
+docs/images/eclipse-dictation.png	Resource reference/header inspection; no device playback/render
+docs/images/eclipse-setting.png	Resource reference/header inspection; no device playback/render
+docs/images/hero.png	Resource reference/header inspection; no device playback/render
+docs/images/models.png	Resource reference/header inspection; no device playback/render
+docs/images/recorder.png	Resource reference/header inspection; no device playback/render
+install.sh	Documentation, script, configuration or integration review
+scripts/benchmark.py	Documentation, script, configuration or integration review
+scripts/build.sh	Documentation, script, configuration or integration review
+scripts/check-recording-sounds.py	Documentation, script, configuration or integration review
+scripts/icon.sh	Documentation, script, configuration or integration review
+scripts/test-audit-persistence.sh	Documentation, script, configuration or integration review
+scripts/test-audit-portable.sh	Documentation, script, configuration or integration review
+scripts/test-audit-providers.sh	Documentation, script, configuration or integration review
+scripts/test-audit-recording.sh	Documentation, script, configuration or integration review
+scripts/test-core.sh	Documentation, script, configuration or integration review
+scripts/third-party-licenses.py	Documentation, script, configuration or integration review
+scripts/validate-dock-controller.py	Documentation, script, configuration or integration review

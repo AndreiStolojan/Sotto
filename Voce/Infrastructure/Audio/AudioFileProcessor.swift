@@ -77,7 +77,7 @@ class AudioProcessor {
 
         while currentFrame < totalFrames {
             let remainingFrames = totalFrames - currentFrame
-            let framesToRead = min(chunkSize, AVAudioFrameCount(remainingFrames))
+            let framesToRead = AVAudioFrameCount(min(AVAudioFramePosition(chunkSize), remainingFrames))
 
             guard let inputBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: framesToRead) else {
                 throw AudioProcessingError.conversionFailed
@@ -95,18 +95,27 @@ class AudioProcessor {
                 }
 
                 let ratio = AudioFormat.targetSampleRate / sampleRate
-                let outputFrameCount = AVAudioFrameCount(Double(inputBuffer.frameLength) * ratio)
+                // Room for the whole chunk plus the resampler's flushed tail.
+                let outputFrameCount = AVAudioFrameCount((Double(inputBuffer.frameLength) * ratio).rounded(.up)) + 1_024
 
                 guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: outputFrameCount)
                 else {
                     throw AudioProcessingError.conversionFailed
                 }
 
+                // The converter may ask for input more than once. Hand over the chunk once, then
+                // end the stream; returning the same buffer again would repeat its audio.
+                var didProvideInput = false
                 var error: NSError?
                 let status = converter.convert(
                     to: outputBuffer,
                     error: &error,
-                    withInputFrom: { inNumPackets, outStatus in
+                    withInputFrom: { _, outStatus in
+                        guard !didProvideInput else {
+                            outStatus.pointee = .endOfStream
+                            return nil
+                        }
+                        didProvideInput = true
                         outStatus.pointee = .haveData
                         return inputBuffer
                     }

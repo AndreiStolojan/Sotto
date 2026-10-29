@@ -28,20 +28,26 @@ enum BackupImporter {
             )
         }
 
-        if categories.contains(.prompts) {
+        // A backup without prompts or modes decodes them as empty arrays. Skip
+        // those categories instead of deleting everything the user has.
+        if categories.contains(.prompts), !backup.customPrompts.isEmpty {
             enhancementService.customPrompts = backup.customPrompts
             shouldRepairModePromptSelections = true
             print("Successfully imported \(backup.customPrompts.count) prompts.")
         }
 
-        if categories.contains(.modes) {
+        if categories.contains(.modes), !backup.modeConfigs.isEmpty {
             let modeManager = ModeManager.shared
             for config in modeManager.configurations {
                 ShortcutStore.removeShortcutStorage(for: .mode(config.id))
             }
 
-            modeManager.configurations = backup.modeConfigs
-            let importedModeIds = Set(backup.modeConfigs.map(\.id))
+            // A hand-edited backup can repeat a mode ID. Keep the first so
+            // ID-keyed lookups and the next export cannot trap on duplicates.
+            var importedModeIds = Set<UUID>()
+            let importedConfigs = backup.modeConfigs.filter { importedModeIds.insert($0.id).inserted }
+            // Saves and tells shortcut monitors that the enabled modes changed.
+            modeManager.replaceConfigurations(importedConfigs)
 
             if let shortcuts = backup.modeShortcuts {
                 for (idString, shortcutBackup) in shortcuts {
@@ -56,7 +62,6 @@ enum BackupImporter {
                 }
             }
 
-            modeManager.saveConfigurations()
             shouldRepairModePromptSelections = true
 
             if let customEmojis = backup.customEmojis {
@@ -65,7 +70,7 @@ enum BackupImporter {
                     _ = emojiManager.addCustomEmoji(emoji)
                 }
             }
-            print("Successfully imported \(backup.modeConfigs.count) Mode configurations.")
+            print("Successfully imported \(importedConfigs.count) Mode configurations.")
         }
 
         if shouldRepairModePromptSelections {
@@ -154,13 +159,19 @@ enum BackupImporter {
         if let transcriptionCleanup = general.isTranscriptionCleanupEnabled {
             UserDefaults.standard.set(transcriptionCleanup, forKey: CleanupSettingsKeys.isTranscriptionCleanupEnabled)
         }
-        if let transcriptionMinutes = general.transcriptionRetentionMinutes {
+        // Out-of-range retention values are skipped rather than clamped, because
+        // clamping could delete history sooner than the backup intended.
+        if let transcriptionMinutes = general.transcriptionRetentionMinutes,
+            SettingsValueLimits.transcriptionRetentionMinutes.contains(transcriptionMinutes)
+        {
             UserDefaults.standard.set(transcriptionMinutes, forKey: CleanupSettingsKeys.transcriptionRetentionMinutes)
         }
         if let audioCleanup = general.isAudioCleanupEnabled {
             UserDefaults.standard.set(audioCleanup, forKey: CleanupSettingsKeys.isAudioCleanupEnabled)
         }
-        if let audioRetention = general.audioRetentionPeriod {
+        if let audioRetention = general.audioRetentionPeriod,
+            SettingsValueLimits.audioRetentionDays.contains(audioRetention)
+        {
             UserDefaults.standard.set(audioRetention, forKey: CleanupSettingsKeys.audioRetentionPeriod)
         }
 
@@ -171,7 +182,10 @@ enum BackupImporter {
             playbackController.isPauseMediaEnabled = pauseMedia
         }
         if let audioDelay = general.audioResumptionDelay {
-            mediaController.audioResumptionDelay = audioDelay
+            mediaController.audioResumptionDelay = SettingsValueLimits.clamped(
+                audioDelay,
+                to: SettingsValueLimits.audioResumptionDelay
+            )
         }
         if let experimentalEnabled = general.isExperimentalFeaturesEnabled {
             UserDefaults.standard.set(experimentalEnabled, forKey: "isExperimentalFeaturesEnabled")
@@ -186,7 +200,10 @@ enum BackupImporter {
             UserDefaults.standard.set(restoreClipboard, forKey: "restoreClipboardAfterPaste")
         }
         if let clipboardDelay = general.clipboardRestoreDelay {
-            UserDefaults.standard.set(clipboardDelay, forKey: "clipboardRestoreDelay")
+            UserDefaults.standard.set(
+                SettingsValueLimits.clamped(clipboardDelay, to: SettingsValueLimits.clipboardRestoreDelay),
+                forKey: "clipboardRestoreDelay"
+            )
         }
         if let finishAndSendKey = general.finishAndSendKey.flatMap(FinishAndSendKey.init(rawValue:)) {
             UserDefaults.standard.set(finishAndSendKey.rawValue, forKey: FinishAndSendSettings.key)

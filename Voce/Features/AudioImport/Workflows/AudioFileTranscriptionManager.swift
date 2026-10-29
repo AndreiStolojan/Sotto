@@ -79,9 +79,10 @@ class AudioTranscriptionManager: ObservableObject {
         processingTask = Task { [weak self] in
             guard let self else { return }
 
-            while let item = self.nextPendingItem() {
+            while self.processingGeneration == generation, let item = self.nextPendingItem() {
                 guard !Task.isCancelled else { break }
-                await self.processItem(item, modelContext: modelContext, engine: engine, mode: mode)
+                await self.processItem(
+                    item, modelContext: modelContext, engine: engine, mode: mode, generation: generation)
             }
 
             if self.processingGeneration == generation {
@@ -90,9 +91,12 @@ class AudioTranscriptionManager: ObservableObject {
         }
     }
 
+    /// Stops the queue. The cancelled run may still be awaiting a model or provider; bumping the
+    /// generation makes it stale, so it can no longer change an item, save a transcription or keep its audio.
     func cancelProcessing() {
         processingTask?.cancel()
         processingTask = nil
+        processingGeneration &+= 1
         isProcessingQueue = false
 
         // Reset any in-progress items back to pending
@@ -119,14 +123,29 @@ class AudioTranscriptionManager: ObservableObject {
         }
     }
 
+    /// Throws `CancellationError` once the task is cancelled or a newer run replaced this one.
+    private func ensureCurrent(_ generation: UInt64) throws {
+        try Task.checkCancellation()
+        guard processingGeneration == generation else { throw CancellationError() }
+    }
+
+    /// Updates the item only while this run is still the current one.
+    private func setStatus(_ status: QueueItemStatus, of item: AudioFileQueueItem, generation: UInt64) {
+        guard processingGeneration == generation else { return }
+        item.status = status
+    }
+
     private func processItem(
-        _ item: AudioFileQueueItem, modelContext: ModelContext, engine: VoceEngine, mode: ModeConfig
+        _ item: AudioFileQueueItem, modelContext: ModelContext, engine: VoceEngine, mode: ModeConfig,
+        generation: UInt64
     ) async {
         let serviceRegistry = TranscriptionServiceRegistry(
             modelProvider: engine.whisperModelManager,
             modelsDirectory: engine.whisperModelManager.modelsDirectory,
             modelContext: modelContext
         )
+        // The converted copy, until a saved transcription owns it.
+        var unsavedAudioURL: URL?
 
         do {
             guard
@@ -140,20 +159,21 @@ class AudioTranscriptionManager: ObservableObject {
             let currentModel = transcriptionConfiguration.model
 
             // Phase: Loading
-            item.status = .processing(phase: .loading)
-            try Task.checkCancellation()
+            setStatus(.processing(phase: .loading), of: item, generation: generation)
+            try ensureCurrent(generation)
 
             // Phase: Processing Audio
-            item.status = .processing(phase: .processingAudio)
+            setStatus(.processing(phase: .processingAudio), of: item, generation: generation)
 
             let accessing = item.url.startAccessingSecurityScopedResource()
             defer { if accessing { item.url.stopAccessingSecurityScopedResource() } }
 
             let samples = try await audioProcessor.processAudioToSamples(item.url)
-            try Task.checkCancellation()
+            try ensureCurrent(generation)
 
             let audioAsset = AVURLAsset(url: item.url)
             let duration = CMTimeGetSeconds(try await audioAsset.load(.duration))
+            try ensureCurrent(generation)
 
             let recordingsDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[
                 0
@@ -165,11 +185,12 @@ class AudioTranscriptionManager: ObservableObject {
             let permanentURL = recordingsDirectory.appendingPathComponent(fileName)
 
             try FileManager.default.createDirectory(at: recordingsDirectory, withIntermediateDirectories: true)
+            unsavedAudioURL = permanentURL
             try audioProcessor.saveSamplesAsWav(samples: samples, to: permanentURL)
-            try Task.checkCancellation()
+            try ensureCurrent(generation)
 
             // Phase: Transcribing
-            item.status = .processing(phase: .transcribing)
+            setStatus(.processing(phase: .transcribing), of: item, generation: generation)
             let transcriptionStart = Date()
             var text = try await serviceRegistry.transcribe(
                 audioURL: permanentURL,
@@ -177,6 +198,7 @@ class AudioTranscriptionManager: ObservableObject {
                 context: transcriptionConfiguration.requestContext
             )
             let transcriptionDuration = Date().timeIntervalSince(transcriptionStart)
+            try ensureCurrent(generation)
             text = TranscriptionOutputFilter.filter(text)
             text = text.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -189,7 +211,6 @@ class AudioTranscriptionManager: ObservableObject {
 
             text = WordReplacementService.shared.applyReplacements(to: text, using: modelContext)
             let cleanedText = text
-            try Task.checkCancellation()
 
             // Handle enhancement if enabled
             var transcription: Transcription
@@ -210,7 +231,7 @@ class AudioTranscriptionManager: ObservableObject {
                 enhancementConfiguration.isEnabled,
                 enhancementService.isConfigured(for: enhancementConfiguration)
             {
-                item.status = .processing(phase: .enhancing)
+                setStatus(.processing(phase: .enhancing), of: item, generation: generation)
                 do {
                     let enhancementResult = try await enhancementService.enhance(
                         text,
@@ -233,6 +254,8 @@ class AudioTranscriptionManager: ObservableObject {
                         modeName: modeMetadata.name,
                         modeEmoji: modeMetadata.emoji
                     )
+                } catch is CancellationError {
+                    throw CancellationError()
                 } catch {
                     let failureMessage = EnhancementFailureFormatter.message(for: error)
                     transcription = Transcription(
@@ -262,8 +285,17 @@ class AudioTranscriptionManager: ObservableObject {
                 )
             }
 
+            // A provider may ignore cancellation, so check again before anything becomes permanent.
+            try ensureCurrent(generation)
             modelContext.insert(transcription)
-            try modelContext.save()
+            do {
+                try modelContext.save()
+            } catch {
+                // Never leave an unsaved record behind for a later save to persist without its audio.
+                modelContext.delete(transcription)
+                throw error
+            }
+            unsavedAudioURL = nil
             NotificationCenter.default.post(name: .transcriptionCreated, object: transcription)
             NotificationCenter.default.post(name: .transcriptionCompleted, object: transcription)
 
@@ -272,8 +304,12 @@ class AudioTranscriptionManager: ObservableObject {
             lastCompletedItemId = item.id
 
         } catch {
-            if Task.isCancelled || error is CancellationError {
-                item.status = .pending
+            if let unsavedAudioURL {
+                try? FileManager.default.removeItem(at: unsavedAudioURL)
+            }
+            if error is CancellationError || Task.isCancelled || processingGeneration != generation {
+                // `cancelProcessing()` already returned a stale item to pending.
+                setStatus(.pending, of: item, generation: generation)
             } else {
                 logger.error("Transcription error: \(error, privacy: .public)")
                 item.status = .failed(message: error.localizedDescription)

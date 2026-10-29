@@ -42,6 +42,8 @@ final class DashboardStatsSnapshotStore: @unchecked Sendable {
     private let snapshotURL: URL
     private let saveQueue = DispatchQueue(
         label: "ro.andrei.Voce.dashboardStatsSnapshotStore", qos: .utility)
+    private let staleLock = NSLock()
+    private var staleGeneration: UInt64 = 0
 
     private init(fileManager: FileManager = .default, userDefaults: UserDefaults = .standard) {
         self.fileManager = fileManager
@@ -76,10 +78,18 @@ final class DashboardStatsSnapshotStore: @unchecked Sendable {
         }
     }
 
-    func saveSummary(_ summary: DashboardStatsSummary) -> Metadata {
+    /// Counts `markStale` calls in this process. Read it before computing a
+    /// summary and pass it to `saveSummary`.
+    func currentStaleGeneration() -> UInt64 {
+        staleLock.withLock { staleGeneration }
+    }
+
+    /// Writes the snapshot in the background. The stale mark is cleared only if
+    /// no `markStale` call happened since `staleGeneration` was read, so a metric
+    /// change during the load or the write is not lost.
+    func saveSummary(_ summary: DashboardStatsSummary, computedAtStaleGeneration staleGeneration: UInt64) -> Metadata {
         let snapshotURL = snapshotURL
         let logger = logger
-        let userDefaults = userDefaults
         let metadata = Metadata(
             version: Self.currentVersion,
             generatedAt: Date(),
@@ -100,7 +110,7 @@ final class DashboardStatsSnapshotStore: @unchecked Sendable {
                 )
                 let data = try JSONEncoder().encode(snapshot)
                 try data.write(to: snapshotURL, options: [.atomic])
-                userDefaults.removeObject(forKey: Self.staleDefaultsKey)
+                self.clearStaleMark(ifGenerationIs: staleGeneration)
             } catch {
                 logger.error("Failed to save dashboard stats snapshot: \(error, privacy: .public)")
             }
@@ -110,7 +120,17 @@ final class DashboardStatsSnapshotStore: @unchecked Sendable {
     }
 
     func markStale() {
-        userDefaults.set(true, forKey: Self.staleDefaultsKey)
+        staleLock.withLock {
+            staleGeneration &+= 1
+            userDefaults.set(true, forKey: Self.staleDefaultsKey)
+        }
+    }
+
+    private func clearStaleMark(ifGenerationIs expectedGeneration: UInt64) {
+        staleLock.withLock {
+            guard staleGeneration == expectedGeneration else { return }
+            userDefaults.removeObject(forKey: Self.staleDefaultsKey)
+        }
     }
 
     func isMarkedStale() -> Bool {

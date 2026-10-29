@@ -197,7 +197,9 @@ class RecordingShortcutManager: ObservableObject {
                 modifierFlags: [.function]
             )
             let secondaryShortcut: Shortcut? = nil
-            var shortcuts: [ShortcutAction: Shortcut] = [:]
+            // The local build hides most utility shortcuts, but History and Dictionary
+            // still let the user record these two, so they must be monitored.
+            var shortcuts = ShortcutStore.shortcuts(for: [.openQuickHistory, .quickAddToDictionary])
         #else
         let primaryShortcut = primaryRecordingShortcut == .custom ? ShortcutStore.shortcut(for: .primaryRecording) : nil
         let secondaryShortcut =

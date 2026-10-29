@@ -128,10 +128,11 @@ class ImportExportService {
 
         let modeConfigs = modeManager.configurations
         let modeShortcuts = Dictionary(
-            uniqueKeysWithValues: modeConfigs.compactMap { config -> (String, ShortcutBackup)? in
+            modeConfigs.compactMap { config -> (String, ShortcutBackup)? in
                 guard let shortcut = ShortcutStore.shortcut(for: .mode(config.id)) else { return nil }
                 return (config.id.uuidString, ShortcutBackup(shortcut))
-            })
+            },
+            uniquingKeysWith: { first, _ in first })
 
         // Fetch vocabulary words from SwiftData
         var exportedDictionaryItems: [WordBackup]? = nil

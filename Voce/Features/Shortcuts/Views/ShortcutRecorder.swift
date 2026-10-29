@@ -29,6 +29,8 @@ struct ShortcutRecorder: View {
                     .font(.system(size: 12, weight: .medium))
                     .accessibilityLabel("Double Fn to start, Fn to stop, or hold Fn to talk")
                     .help("Double Fn to start. Fn to stop. Hold Fn for 0.5 seconds to talk, then release to stop.")
+            } else if action != .secondaryRecording {
+                editableRecorder
             }
         #else
             editableRecorder

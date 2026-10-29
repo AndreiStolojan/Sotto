@@ -398,19 +398,12 @@ class ModeManager: ObservableObject {
         configurations.contains { $0.isEnabled && !$0.allURLConfigs.isEmpty }
     }
 
+    /// The first enabled mode with a website trigger that `ModeWebsiteMatcher` matches to `url`.
     func getConfigurationForURL(_ url: String) -> ModeConfig? {
-        let cleanedURL = cleanURL(url)
-
-        for config in configurations.filter({ $0.isEnabled }) {
-            for urlConfig in config.allURLConfigs {
-                let configURL = cleanURL(urlConfig.url)
-
-                if cleanedURL.contains(configURL) {
-                    return config
-                }
-            }
+        configurations.first { config in
+            config.isEnabled
+                && config.allURLConfigs.contains { ModeWebsiteMatcher.matches(url: url, website: $0.url) }
         }
-        return nil
     }
 
     func getConfigurationForApp(_ bundleId: String) -> ModeConfig? {

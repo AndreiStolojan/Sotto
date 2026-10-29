@@ -247,6 +247,9 @@ final class FluidAudioStreamingProvider: StreamingTranscriptionProvider {
                 }
             }
 
+        } catch is CancellationError {
+            // commit() or disconnect() stopped the loop; the final pass covers the remaining audio.
+            return
         } catch {
             logger.error("Transcription pass failed: \(error, privacy: .public)")
             eventsContinuation?.yield(.error(error))

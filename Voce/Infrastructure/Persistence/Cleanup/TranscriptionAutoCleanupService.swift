@@ -9,12 +9,6 @@ final class TranscriptionAutoCleanupService {
     private let logger = Logger(subsystem: "ro.andrei.Voce", category: "TranscriptionAutoCleanupService")
     private var modelContext: ModelContext?
 
-    private var recordingsDirectory: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(AppStorageNamespace.applicationSupportDirectoryName)
-            .appendingPathComponent("Recordings")
-    }
-
     private init() {}
 
     func startMonitoring(modelContext: ModelContext) {
@@ -70,23 +64,25 @@ final class TranscriptionAutoCleanupService {
             return
         }
 
-        if let urlString = transcription.audioFileURL,
-            let url = URL(string: urlString)
-        {
-            do {
-                try FileManager.default.removeItem(at: url)
-            } catch {
-                logger.error("Failed to delete audio file: \(error, privacy: .public)")
-            }
-        }
-
+        // Delete the audio only after the record is gone, so a failed save
+        // never leaves a transcription pointing at a deleted file.
+        let audioURL = RecordingFileLocation.ownedFileURL(from: transcription.audioFileURL)
         modelContext.delete(transcription)
 
         do {
             try modelContext.save()
-            NotificationCenter.default.post(name: .transcriptionDeleted, object: nil)
         } catch {
             logger.error("Failed to save after transcription deletion: \(error, privacy: .public)")
+            return
+        }
+        NotificationCenter.default.post(name: .transcriptionDeleted, object: nil)
+
+        if let audioURL {
+            do {
+                try FileManager.default.removeItem(at: audioURL)
+            } catch {
+                logger.error("Failed to delete audio file: \(error, privacy: .public)")
+            }
         }
     }
 
@@ -96,9 +92,8 @@ final class TranscriptionAutoCleanupService {
         }
 
         let retentionMinutes = UserDefaults.standard.integer(forKey: CleanupSettingsKeys.transcriptionRetentionMinutes)
-        let effectiveMinutes = max(retentionMinutes, 0)
-
-        let cutoffDate = Date().addingTimeInterval(TimeInterval(-effectiveMinutes * 60))
+        // Floating point keeps a huge stored value from trapping on `* 60`.
+        let cutoffDate = Date().addingTimeInterval(-TimeInterval(max(retentionMinutes, 0)) * 60)
 
         do {
             let deletedCount = try await worker.sweepOldTranscriptions(before: cutoffDate)
@@ -118,7 +113,10 @@ final class TranscriptionAutoCleanupService {
         }
 
         do {
-            let deletedCount = try await worker.cleanupOrphanAudioFiles(in: recordingsDirectory)
+            let deletedCount = try await worker.cleanupOrphanAudioFiles(
+                in: RecordingFileLocation.recordingsDirectory,
+                modifiedBefore: Date().addingTimeInterval(-Self.orphanAudioGracePeriod)
+            )
             if deletedCount > 0 {
                 logger.notice("Cleaned up \(deletedCount, privacy: .public) orphan audio file(s)")
             }
@@ -126,6 +124,10 @@ final class TranscriptionAutoCleanupService {
             logger.error("Failed during orphan audio cleanup: \(error, privacy: .public)")
         }
     }
+
+    /// Recordings, imports and retranscriptions write audio before their
+    /// transcription is saved. Files this recent may still be in flight.
+    private static let orphanAudioGracePeriod: TimeInterval = 24 * 60 * 60
 
     private nonisolated static func makeWorker(
         modelContainer: ModelContainer
@@ -145,24 +147,31 @@ private actor TranscriptionCleanupWorker {
             }
         )
         let transcriptions = try modelContext.fetch(descriptor)
+        guard !transcriptions.isEmpty else { return 0 }
 
+        let audioURLs = transcriptions.compactMap {
+            RecordingFileLocation.ownedFileURL(from: $0.audioFileURL)
+        }
         for transcription in transcriptions {
-            if let urlString = transcription.audioFileURL,
-                let url = URL(string: urlString),
-                FileManager.default.fileExists(atPath: url.path)
-            {
-                try? FileManager.default.removeItem(at: url)
-            }
             modelContext.delete(transcription)
         }
-
-        if !transcriptions.isEmpty {
+        do {
             try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+
+        // Files that fail to delete become orphans for the next orphan sweep.
+        for url in audioURLs {
+            try? FileManager.default.removeItem(at: url)
         }
         return transcriptions.count
     }
 
-    func cleanupOrphanAudioFiles(in recordingsDirectory: URL) throws -> Int {
+    /// Deletes files in Recordings that no transcription references and that were
+    /// last modified before `cutoffDate`.
+    func cleanupOrphanAudioFiles(in recordingsDirectory: URL, modifiedBefore cutoffDate: Date) throws -> Int {
         var descriptor = FetchDescriptor<Transcription>()
         descriptor.propertiesToFetch = [\.audioFileURL]
 
@@ -178,11 +187,16 @@ private actor TranscriptionCleanupWorker {
         guard FileManager.default.fileExists(atPath: recordingsDirectory.path) else { return 0 }
         let filesInDirectory = try FileManager.default.contentsOfDirectory(
             at: recordingsDirectory,
-            includingPropertiesForKeys: nil
+            includingPropertiesForKeys: [.isRegularFileKey, .contentModificationDateKey]
         )
 
         var deletedCount = 0
         for fileURL in filesInDirectory where !referencedFiles.contains(fileURL.lastPathComponent) {
+            guard let values = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .contentModificationDateKey]),
+                values.isRegularFile == true,
+                let modificationDate = values.contentModificationDate,
+                modificationDate < cutoffDate
+            else { continue }
             do {
                 try FileManager.default.removeItem(at: fileURL)
                 deletedCount += 1

@@ -230,23 +230,29 @@ class ScreenCaptureService: ObservableObject {
         }
     }
 
+    /// Returns the operation's result, or nil once `seconds` pass or the caller is
+    /// cancelled. A task group would wait for the operation to finish even after
+    /// the timeout, and Vision OCR does not stop on cancellation, so the
+    /// operation runs unstructured and is cancelled and abandoned instead.
     private nonisolated static func withTimeout<T: Sendable>(
         seconds: TimeInterval,
         operation: @escaping @Sendable () async -> T?
     ) async -> T? {
-        await withTaskGroup(of: T?.self) { group in
-            group.addTask {
-                await operation()
+        let result = FirstResult<T>()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                result.setContinuation(continuation)
+                let operationTask = Task {
+                    result.resume(with: await operation())
+                }
+                result.setOperationTask(operationTask)
+                Task {
+                    try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                    result.resume(with: nil)
+                }
             }
-
-            group.addTask {
-                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                return nil
-            }
-
-            let result = await group.next() ?? nil
-            group.cancelAll()
-            return result
+        } onCancel: {
+            result.resume(with: nil)
         }
     }
 
@@ -317,5 +323,46 @@ class ScreenCaptureService: ObservableObject {
 
     private func normalized(_ text: String?) -> String? {
         Self.normalized(text)
+    }
+}
+
+/// Resumes a continuation once with whichever result arrives first, then
+/// cancels the operation that lost the race.
+private final class FirstResult<T: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<T?, Never>?
+    private var operationTask: Task<Void, Never>?
+    private var isFinished = false
+
+    func setContinuation(_ continuation: CheckedContinuation<T?, Never>) {
+        lock.withLock {
+            if isFinished {
+                continuation.resume(returning: nil)
+            } else {
+                self.continuation = continuation
+            }
+        }
+    }
+
+    func setOperationTask(_ task: Task<Void, Never>) {
+        let shouldCancel = lock.withLock {
+            operationTask = task
+            return isFinished
+        }
+        if shouldCancel { task.cancel() }
+    }
+
+    func resume(with value: T?) {
+        let (continuation, task) = lock.withLock { () -> (CheckedContinuation<T?, Never>?, Task<Void, Never>?) in
+            guard !isFinished else { return (nil, nil) }
+            isFinished = true
+            defer {
+                self.continuation = nil
+                operationTask = nil
+            }
+            return (self.continuation, operationTask)
+        }
+        continuation?.resume(returning: value)
+        task?.cancel()
     }
 }

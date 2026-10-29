@@ -125,8 +125,7 @@ struct DashboardContent: View {
             refreshAccessibilityStatus()
         }
         .onReceive(NotificationCenter.default.publisher(for: .sessionMetricsDidChange)) { _ in
-            DashboardStatsCache.shared.markStale()
-
+            // DashboardStatsCache marks itself stale for this notification.
             if shouldRefreshStatsAfterMetricChange {
                 scheduleDashboardStatsRefresh(debounce: true, allowSkipWhenFresh: false)
             }
@@ -526,6 +525,7 @@ struct DashboardContent: View {
                 return
             }
 
+            let staleGeneration = DashboardStatsCache.shared.currentStaleGeneration()
             let summary = try await DashboardStatsLoader.load(from: modelContainer)
 
             guard !Task.isCancelled else {
@@ -547,7 +547,7 @@ struct DashboardContent: View {
                 }
 
                 self.statsSummary = summary
-                let metadata = DashboardStatsCache.shared.update(summary)
+                let metadata = DashboardStatsCache.shared.update(summary, computedAtStaleGeneration: staleGeneration)
                 self.statsSnapshotGeneratedAt = metadata.generatedAt
                 self.hasLoadedStatsSnapshot = true
             }

@@ -345,6 +345,12 @@ class CustomSoundManager: ObservableObject {
             let copyResult = copySoundFile(from: url, standardName: type.standardName)
             switch copyResult {
             case .success(let filename):
+                // A new extension gives a new filename; drop the previous copy instead of orphaning it.
+                if let previousFilename = getSoundDisplayName(for: type), previousFilename != filename,
+                    let directory = customSoundsDirectory()
+                {
+                    try? FileManager.default.removeItem(at: directory.appendingPathComponent(previousFilename))
+                }
                 if type == .start {
                     customStartSoundFilename = filename
                 } else {

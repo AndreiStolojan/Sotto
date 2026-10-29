@@ -106,12 +106,16 @@ actor AutoLearnReviewProposalStore {
         }
     }
 
+    /// Marks the store loaded only after a successful read, so a transient read
+    /// failure is retried instead of letting the next save overwrite the file.
     private func loadIfNeeded() throws {
         guard !isLoaded else { return }
-        defer { isLoaded = true }
-        guard fileManager.fileExists(atPath: fileURL.path) else { return }
-        let data = try Data(contentsOf: fileURL)
-        proposals = try JSONDecoder().decode([AutoLearnReviewProposal].self, from: data)
+        proposals = try AutoLearnJSONArrayFile.load(
+            AutoLearnReviewProposal.self,
+            from: fileURL,
+            fileManager: fileManager
+        )
+        isLoaded = true
     }
 
     private func save() throws {

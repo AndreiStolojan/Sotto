@@ -19,16 +19,18 @@ class WaveformGenerator {
     private static let cache = NSCache<NSString, NSArray>()
 
     static func generateWaveformSamples(from url: URL, sampleCount: Int = 200) async -> [Float] {
-        let cacheKey = url.absoluteString as NSString
+        guard sampleCount > 0 else { return [] }
+        let cacheKey = "\(url.absoluteString)#\(sampleCount)" as NSString
 
         if let cachedSamples = cache.object(forKey: cacheKey) as? [Float] {
             return cachedSamples
         }
         guard let audioFile = try? AVAudioFile(forReading: url) else { return [] }
         let format = audioFile.processingFormat
-        let frameCount = UInt32(audioFile.length)
+        let frameCount = audioFile.length
+        guard frameCount > 0 else { return [] }
         let stride = max(1, Int(frameCount) / sampleCount)
-        let bufferSize = min(UInt32(4096), frameCount)
+        let bufferSize = AVAudioFrameCount(min(4096, frameCount))
 
         guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: bufferSize) else { return [] }
 
@@ -123,12 +125,15 @@ class AudioPlayerManager: ObservableObject {
         stopTimer()
     }
 
+    /// Clamps to the file, since a waveform drag can report points outside the view.
     func seek(to time: TimeInterval) {
-        audioPlayer?.currentTime = time
-        currentTime = time
+        let clampedTime = time.isFinite ? min(max(time, 0), duration) : 0
+        audioPlayer?.currentTime = clampedTime
+        currentTime = clampedTime
     }
 
     private func startTimer() {
+        timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             self.currentTime = self.audioPlayer?.currentTime ?? 0
@@ -599,9 +604,7 @@ struct AudioPlayerView: View {
 
         Task {
             do {
-                transcription.aiEnhancementModelName =
-                    enhancementConfiguration.modelName ?? enhancementConfiguration.provider?.defaultModel
-                transcription.promptName = enhancementConfiguration.prompt?.title
+                // Metadata changes only with a new result, so a failure keeps it matching the old text.
                 let enhancementResult = try await enhancementService.enhance(
                     transcription.text,
                     configuration: enhancementConfiguration
@@ -615,7 +618,16 @@ struct AudioPlayerView: View {
                     transcription.enhancementDuration = enhancementResult.duration
                     transcription.aiRequestSystemMessage = enhancementResult.systemMessage
                     transcription.aiRequestUserMessage = enhancementResult.userMessage
-                    try? modelContext.save()
+                    do {
+                        try modelContext.save()
+                    } catch {
+                        modelContext.rollback()
+                        isReEnhancing = false
+                        showErrorNotification(
+                            error.localizedDescription.isEmpty
+                                ? String(localized: "Could not save re-enhancement") : error.localizedDescription)
+                        return
+                    }
 
                     isReEnhancing = false
                     showSuccessFeedback(.reEnhanceSuccess, title: String(localized: "Re-enhancement successful"))

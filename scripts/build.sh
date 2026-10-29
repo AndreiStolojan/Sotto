@@ -72,7 +72,7 @@ fi
 
 # Settings shows the commit and compares it with the channel's branch on GitHub. Only a checkout whose own
 # top level is this folder counts, so a source copy inside another repository gets no commit ("local build").
-commit= commit_label="local build"
+commit='' commit_label="local build"
 if cdup="$(git -C "$repo_dir" rev-parse --show-cdup 2>/dev/null)" && [[ -z "$cdup" ]]; then
     commit="$(git -C "$repo_dir" rev-parse HEAD)"
     commit_label="${commit:0:7}"

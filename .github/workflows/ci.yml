@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, beta]
   push:
-    branches: [main]
+    branches: [main, beta]
   workflow_dispatch:
 
 permissions:
@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   scripts:
-    name: Shell checks
+    name: Script checks
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:
@@ -26,6 +26,10 @@ jobs:
           for script in install.sh scripts/*.sh; do
             bash -n "$script"
           done
+      - name: Test benchmark bookkeeping with synthetic fixtures
+        run: python3 -m unittest discover -s Tests/Benchmark -v
+      - name: Test installer channel locking
+        run: python3 -m unittest discover -s Tests/Installer -v
       - name: Lint shell scripts
         run: shellcheck install.sh scripts/*.sh
 
@@ -45,6 +49,18 @@ jobs:
       - name: Run core tests
         timeout-minutes: 2
         run: bash scripts/test-core.sh
+      - name: Test privacy boundaries and JSON recovery
+        timeout-minutes: 2
+        run: bash scripts/test-audit-portable.sh
+      - name: Test imported settings bounds
+        timeout-minutes: 2
+        run: bash scripts/test-audit-persistence.sh
+      - name: Test process cancellation and archive safety
+        timeout-minutes: 3
+        run: bash scripts/test-audit-providers.sh
+      - name: Test literal History CSV export
+        timeout-minutes: 2
+        run: bash scripts/test-audit-recording.sh
       - name: Check dictation sound preferences and playback gain
         timeout-minutes: 2
         run: python3 scripts/check-recording-sounds.py

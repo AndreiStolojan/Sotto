@@ -10,10 +10,7 @@ import os
 // Meet Whisper C++ constraint: Don't access from more than one thread at a time.
 actor WhisperContext {
     private var context: OpaquePointer?
-    private var language: String?
-    private var languageCString: [CChar]?
     private var prompt: String?
-    private var promptCString: [CChar]?
     private var vadModelPath: String?
     private let logger = Logger(subsystem: "ro.andrei.Voce", category: "WhisperContext")
 
@@ -29,32 +26,19 @@ actor WhisperContext {
         }
     }
 
-    func fullTranscribe(samples: [Float]) -> Bool {
-        guard let context = context else { return false }
+    /// Runs one complete transcription in a single actor turn, so concurrent callers sharing this
+    /// context cannot interleave settings or read each other's segments. A nil language means
+    /// auto-detect, and a nil prompt falls back to the one set with `setPrompt`. Returns nil if
+    /// whisper fails.
+    func transcribe(samples: [Float], language requestedLanguage: String?, prompt requestedPrompt: String?) -> String? {
+        guard let context = context else { return nil }
 
         let maxThreads = max(1, min(8, cpuCount() - 2))
         var params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY)
 
-        let selectedLanguage = language ?? "auto"
-        if selectedLanguage != "auto" {
-            languageCString = Array(selectedLanguage.utf8CString)
-            params.language = languageCString?.withUnsafeBufferPointer { ptr in
-                ptr.baseAddress
-            }
-        } else {
-            languageCString = nil
-            params.language = nil
-        }
-
-        if prompt != nil {
-            promptCString = Array(prompt!.utf8CString)
-            params.initial_prompt = promptCString?.withUnsafeBufferPointer { ptr in
-                ptr.baseAddress
-            }
-        } else {
-            promptCString = nil
-            params.initial_prompt = nil
-        }
+        let selectedLanguage = requestedLanguage ?? "auto"
+        let languageArgument = selectedLanguage == "auto" ? nil : selectedLanguage
+        let promptArgument = requestedPrompt ?? prompt
 
         params.print_realtime = true
         params.print_progress = false
@@ -71,10 +55,9 @@ actor WhisperContext {
 
         // Configure VAD if enabled by user and model is available
         let isVADEnabled = UserDefaults.standard.bool(forKey: "IsVADEnabled")
-        if isVADEnabled, let vadModelPath = self.vadModelPath {
+        let vadModelPath = isVADEnabled ? self.vadModelPath : nil
+        if vadModelPath != nil {
             params.vad = true
-            params.vad_model_path = (vadModelPath as NSString).utf8String
-
             var vadParams = whisper_vad_default_params()
             vadParams.threshold = 0.50
             vadParams.min_speech_duration_ms = 250
@@ -87,22 +70,25 @@ actor WhisperContext {
             params.vad = false
         }
 
-        var success = true
-        samples.withUnsafeBufferPointer { samplesBuffer in
-            if whisper_full(context, params, samplesBuffer.baseAddress, Int32(samplesBuffer.count)) != 0 {
-                logger.error("❌ Failed to run whisper_full. VAD enabled: \(params.vad, privacy: .public)")
-                success = false
+        // C strings are only valid inside these scopes, so whisper_full runs within them.
+        let succeeded = withOptionalCString(languageArgument) { languagePointer in
+            withOptionalCString(promptArgument) { promptPointer in
+                withOptionalCString(vadModelPath) { vadModelPathPointer in
+                    params.language = languagePointer
+                    params.initial_prompt = promptPointer
+                    params.vad_model_path = vadModelPathPointer
+                    return samples.withUnsafeBufferPointer { samplesBuffer in
+                        whisper_full(context, params, samplesBuffer.baseAddress, Int32(samplesBuffer.count)) == 0
+                    }
+                }
             }
         }
 
-        languageCString = nil
-        promptCString = nil
+        guard succeeded else {
+            logger.error("❌ Failed to run whisper_full. VAD enabled: \(params.vad, privacy: .public)")
+            return nil
+        }
 
-        return success
-    }
-
-    func getTranscription() -> String {
-        guard let context = context else { return "" }
         var transcription = ""
         for i in 0..<whisper_full_n_segments(context) {
             transcription += String(cString: whisper_full_get_segment_text(context, i))
@@ -147,21 +133,17 @@ actor WhisperContext {
         }
     }
 
-    func releaseResources() {
-        if let context = context {
-            whisper_free(context)
-            self.context = nil
-        }
-        languageCString = nil
-    }
-
     func setPrompt(_ prompt: String?) {
         self.prompt = prompt
     }
+}
 
-    func setLanguage(_ language: String?) {
-        self.language = language
-    }
+/// Passes a C string pointer, or nil for a nil string, that is valid only inside `body`.
+fileprivate func withOptionalCString<Result>(
+    _ string: String?, _ body: (UnsafePointer<CChar>?) -> Result
+) -> Result {
+    guard let string else { return body(nil) }
+    return string.withCString { body($0) }
 }
 
 fileprivate func cpuCount() -> Int {

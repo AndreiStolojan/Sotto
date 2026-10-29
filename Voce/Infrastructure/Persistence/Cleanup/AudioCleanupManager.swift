@@ -51,12 +51,7 @@ final class AudioCleanupManager {
     func getCleanupInfo(modelContext: ModelContext) async -> (
         fileCount: Int, totalSize: Int64, transcriptions: [Transcription]
     ) {
-        // Get retention period from UserDefaults
-        let effectiveRetentionDays = UserDefaults.standard.integer(forKey: CleanupSettingsKeys.audioRetentionPeriod)
-
-        // Calculate the cutoff date
-        let calendar = Calendar.current
-        guard let cutoffDate = calendar.date(byAdding: .day, value: -effectiveRetentionDays, to: Date()) else {
+        guard let cutoffDate = Self.retentionCutoffDate() else {
             return (0, 0, [])
         }
 
@@ -77,8 +72,7 @@ final class AudioCleanupManager {
                 var eligibleTranscriptions: [Transcription] = []
 
                 for transcription in transcriptions {
-                    if let urlString = transcription.audioFileURL,
-                        let url = URL(string: urlString),
+                    if let url = RecordingFileLocation.ownedFileURL(from: transcription.audioFileURL),
                         FileManager.default.fileExists(atPath: url.path)
                     {
                         if let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
@@ -100,18 +94,9 @@ final class AudioCleanupManager {
 
     /// Perform the cleanup operation
     private func performCleanup(modelContext: ModelContext) async {
-        // Get retention period from UserDefaults
-        let effectiveRetentionDays = UserDefaults.standard.integer(forKey: CleanupSettingsKeys.audioRetentionPeriod)
-
         // Check if automatic cleanup is enabled
         let isCleanupEnabled = UserDefaults.standard.bool(forKey: CleanupSettingsKeys.isAudioCleanupEnabled)
-        guard isCleanupEnabled else { return }
-
-        // Calculate the cutoff date
-        let calendar = Calendar.current
-        guard let cutoffDate = calendar.date(byAdding: .day, value: -effectiveRetentionDays, to: Date()) else {
-            return
-        }
+        guard isCleanupEnabled, let cutoffDate = Self.retentionCutoffDate() else { return }
 
         do {
             try { () throws -> Void in
@@ -126,8 +111,7 @@ final class AudioCleanupManager {
                 var deletedCount = 0
 
                 for transcription in transcriptions {
-                    if let urlString = transcription.audioFileURL,
-                        let url = URL(string: urlString),
+                    if let url = RecordingFileLocation.ownedFileURL(from: transcription.audioFileURL),
                         FileManager.default.fileExists(atPath: url.path)
                     {
                         do {
@@ -154,6 +138,14 @@ final class AudioCleanupManager {
         await performCleanup(modelContext: modelContext)
     }
 
+    /// Audio older than this date is eligible for cleanup. Returns nil for a
+    /// retention below one day, so a bad stored value cannot delete all audio.
+    private static func retentionCutoffDate() -> Date? {
+        let retentionDays = UserDefaults.standard.integer(forKey: CleanupSettingsKeys.audioRetentionPeriod)
+        guard retentionDays >= 1 else { return nil }
+        return Calendar.current.date(byAdding: .day, value: -retentionDays, to: Date())
+    }
+
     private func shouldRunAutomaticCleanup() -> Bool {
         guard
             let lastCleanupDate = UserDefaults.standard.object(
@@ -173,8 +165,7 @@ final class AudioCleanupManager {
         var errorCount = 0
 
         for transcription in transcriptions {
-            if let urlString = transcription.audioFileURL,
-                let url = URL(string: urlString),
+            if let url = RecordingFileLocation.ownedFileURL(from: transcription.audioFileURL),
                 FileManager.default.fileExists(atPath: url.path)
             {
                 do {

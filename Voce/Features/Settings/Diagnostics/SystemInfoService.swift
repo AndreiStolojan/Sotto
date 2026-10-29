@@ -87,18 +87,21 @@ final class SystemInfoService {
     }
 
     private func getMacModel() -> String {
-        var size = 0
-        sysctlbyname("hw.model", nil, &size, nil, 0)
-        var machine = [CChar](repeating: 0, count: size)
-        sysctlbyname("hw.model", &machine, &size, nil, 0)
-        return String(cString: machine)
+        systemString(for: "hw.model") ?? "Unknown"
     }
 
     private func getCPUInfo() -> String {
+        systemString(for: "machdep.cpu.brand_string") ?? "Unknown"
+    }
+
+    /// Reads a bounded, terminated sysctl string. Missing properties are normal on some hardware.
+    private func systemString(for name: String) -> String? {
         var size = 0
-        sysctlbyname("machdep.cpu.brand_string", nil, &size, nil, 0)
-        var buffer = [CChar](repeating: 0, count: size)
-        sysctlbyname("machdep.cpu.brand_string", &buffer, &size, nil, 0)
+        guard sysctlbyname(name, nil, &size, nil, 0) == 0,
+            size > 0, size <= 65_536
+        else { return nil }
+        var buffer = [CChar](repeating: 0, count: size + 1)
+        guard sysctlbyname(name, &buffer, &size, nil, 0) == 0 else { return nil }
         return String(cString: buffer)
     }
 
@@ -211,7 +214,7 @@ final class SystemInfoService {
                 return value
             }
 
-        return configuration.isEmpty ? "Enabled (Not configured)" : configuration.joined(separator: " — ")
+        return configuration.isEmpty ? "Enabled (Not configured)" : configuration.joined(separator: ", ")
     }
 
     private func getAccessibilityStatus() -> String {

@@ -314,6 +314,10 @@ class FluidAudioModelManager: ObservableObject {
                 modelStateRevision += 1
             } else {
                 logger.error("❌ FluidAudio download failed for \(modelName, privacy: .public): \(error, privacy: .public)")
+                NotificationManager.shared.showNotification(
+                    title: String(format: String(localized: "%@ download failed"), model.displayName),
+                    type: .error
+                )
             }
         }
     }

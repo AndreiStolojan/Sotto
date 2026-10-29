@@ -109,6 +109,7 @@ final class TranscriptionDelivery {
         }
     }
 
+    /// Runs the command and logs only sizes and timing: stdout, stderr and error text can echo the transcript.
     private func runCustomCommand(command: String, commandText: String) async {
         let startTime = Date()
         logger.notice("Custom command started")
@@ -123,34 +124,41 @@ final class TranscriptionDelivery {
             let duration = Date().timeIntervalSince(startTime)
             let stdoutBytes = result.stdout.utf8.count
             let stderrBytes = result.stderr.utf8.count
-
-            if !result.stdout.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                logger.notice(
-                    "Custom command stdout bytes=\(stdoutBytes, privacy: .public): \(result.stdout, privacy: .public)")
-            }
-
-            if !result.stderr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                logger.notice(
-                    "Custom command succeeded with stderr duration=\(Self.formattedDuration(duration), privacy: .public)s stdoutBytes=\(stdoutBytes, privacy: .public) stderrBytes=\(stderrBytes, privacy: .public): \(result.stderr, privacy: .public)"
-                )
-            } else {
-                logger.notice(
-                    "Custom command succeeded duration=\(Self.formattedDuration(duration), privacy: .public)s stdoutBytes=\(stdoutBytes, privacy: .public) stderrBytes=\(stderrBytes, privacy: .public)"
-                )
-            }
+            logger.notice(
+                "Custom command succeeded duration=\(Self.formattedDuration(duration), privacy: .public)s stdoutBytes=\(stdoutBytes, privacy: .public) stderrBytes=\(stderrBytes, privacy: .public)"
+            )
         } catch {
             notifyCustomCommandFailure(error, duration: Date().timeIntervalSince(startTime))
         }
     }
 
     private func notifyCustomCommandFailure(_ error: Error, duration: TimeInterval? = nil) {
-        let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        let summary = Self.failureSummary(for: error)
         if let duration {
             logger.error(
-                "Custom command failed duration=\(Self.formattedDuration(duration), privacy: .public)s: \(message, privacy: .public)"
+                "Custom command failed duration=\(Self.formattedDuration(duration), privacy: .public)s: \(summary, privacy: .public)"
             )
         } else {
-            logger.error("Custom command failed: \(message, privacy: .public)")
+            logger.error("Custom command failed: \(summary, privacy: .public)")
+        }
+    }
+
+    /// Describes a failure without its free text, which can contain stderr or a launch message.
+    private static func failureSummary(for error: Error) -> String {
+        guard let error = error as? CustomCommandDeliveryError else {
+            return "error=\(String(describing: type(of: error)))"
+        }
+        switch error {
+        case .commandNotConfigured:
+            return "command not configured"
+        case .noTextToDeliver:
+            return "no text to deliver"
+        case .launchFailed(let message):
+            return "launch failed messageBytes=\(message.utf8.count)"
+        case .timeout(let seconds):
+            return "timed out after \(formattedDuration(seconds))s"
+        case .nonZeroExit(let status, let stderr):
+            return "exit status=\(status) stderrBytes=\(stderr.utf8.count)"
         }
     }
 

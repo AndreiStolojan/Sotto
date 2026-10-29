@@ -26,7 +26,7 @@ struct CopyIconButton: View {
     }
 
     private func copy() {
-        let _ = ClipboardManager.copyToClipboard(textToCopy)
+        guard ClipboardManager.copyToClipboard(textToCopy) else { return }
         withAnimation { copied = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             withAnimation { copied = false }

@@ -71,11 +71,12 @@ final class WordReplacementService {
                 logger.debug(
                     "Applying boundary-aware word replacement \(original, privacy: .private) -> \(replacementText, privacy: .private), matches=\(matchCount, privacy: .public)"
                 )
+                // Escape `$` and `\` so the replacement is inserted literally, not as a template.
                 modifiedText = regex.stringByReplacingMatches(
                     in: modifiedText,
                     options: [],
                     range: range,
-                    withTemplate: replacementText
+                    withTemplate: NSRegularExpression.escapedTemplate(for: replacementText)
                 )
                 matchedRuleCount += 1
             } else {

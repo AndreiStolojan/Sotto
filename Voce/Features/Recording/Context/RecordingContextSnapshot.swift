@@ -44,7 +44,8 @@ enum RecordingContextCaptureService {
         var tasks: [Task<Void, Never>] = []
         if clipboard {
             tasks.append(Task { @MainActor in
-                store.updateClipboardText(NSPasteboard.general.string(forType: .string))
+                guard !Task.isCancelled else { return }
+                store.updateClipboardText(CursorPaster.clipboardContextText())
             })
         }
         if selectedText {
